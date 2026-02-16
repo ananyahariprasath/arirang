@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+/* ============================= */
+/* COLOR VARIABLES */
+/* ============================= */
+
+:root {
+  /* Core Palette */
+  --lavender: #C8A2FF;
+  --aesthetic-purple: #7B4AE2;
+  --ivory: #FAF9FF;
+
+  --black-purple: #140A1F;
+  --deep-purple: #2A0E3F;
+  --silver: #C0C0C0;
+  --accent-rgb: 200, 162, 255;
+}
+
+/* ============================= */
+/* LIGHT THEME */
+/* ============================= */
+
+.light {
+  --bg-primary: var(--ivory);
+  --bg-secondary: #F3E8FF;
+  --text-primary: var(--aesthetic-purple);
+  --text-secondary: #5E3EA1;
+  --accent: var(--lavender);
+  --card-bg: #FFFFFF;
+}
+
+/* ============================= */
+/* DARK THEME */
+/* ============================= */
+
+.dark {
+  --bg-primary: var(--black-purple);
+  --bg-secondary: var(--deep-purple);
+  --text-primary: var(--silver);
+  --text-secondary: #D8C8FF;
+  --accent: var(--lavender);
+  --card-bg: #1E0F2E;
+}
+
+/* ============================= */
+/* FOOTER LINE ANIMATION */
+/* ============================= */
+
+@keyframes footerLine {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100vw);
+  }
+}
+
+.animate-footer-line {
+  animation: footerLine 4s linear infinite;
+}
