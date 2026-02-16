@@ -150,4 +150,4 @@ export const PRESAVE_LINKS = {
 
 // URL for live global updates (e.g., a GitHub Gist raw URL)
 // If empty, the app will use local data.json and localStorage
-export const DATA_SOURCE_URL = "https://gist.githubusercontent.com/ananyahariprasath/341cf525f2be0abde6f7f53f4a612552/raw/51e0ccd3cc496fc6bf1bb3fc935c34065396df02/arirang-data.json"; 
+export const DATA_SOURCE_URL = "https://gist.githubusercontent.com/ananyahariprasath/341cf525f2be0abde6f7f53f4a612552/raw/arirang-data.json"; 
