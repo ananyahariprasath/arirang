@@ -84,7 +84,7 @@ export default function useModStatus() {
     const loadData = async () => {
       try {
         if (DATA_SOURCE_URL) {
-          const response = await fetch(DATA_SOURCE_URL);
+          const response = await fetch(`${DATA_SOURCE_URL}?t=${Date.now()}`, { cache: "no-store" });
           const data = await response.json();
           if (data.mods) {
             setMods(data.mods);

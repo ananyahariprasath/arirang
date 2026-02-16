@@ -43,22 +43,22 @@ function CountryDropdown({ selectedCountry, onSelect, disabled = false }) {
 
         {/* Dropdown List */}
         {open && (
-          <div className="absolute w-full mt-2
-           bg-[var(--card-bg)]/40
+           <div className="absolute w-full mt-2
+           bg-[var(--card-bg)]
            backdrop-blur-3xl
            border border-[var(--accent)]/50
            rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.4)]
            overflow-hidden z-50">
 
             {/* Search Input */}
-            <div className="p-3 border-b border-[var(--accent)]/20 bg-black/20">
+            <div className="p-3 border-b border-[var(--accent)]/10 bg-[var(--bg-secondary)]/30">
               <input
                 type="text"
                 placeholder="Search country..."
                 autoFocus
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 rounded-xl px-4 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-all"
+                className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/30 rounded-xl px-4 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-primary)]/40 focus:outline-none focus:border-[var(--accent)] transition-all"
               />
             </div>
 
@@ -73,8 +73,8 @@ function CountryDropdown({ selectedCountry, onSelect, disabled = false }) {
                       setSearchTerm("");
                     }}
                     className="w-full text-left px-6 py-3.5
-                               hover:bg-[var(--accent)] hover:text-black
-                               transition-all font-semibold"
+                               hover:bg-[var(--accent)] hover:text-white dark:hover:text-black
+                               transition-all font-semibold text-[var(--text-primary)]"
                   >
                     {country}
                   </button>

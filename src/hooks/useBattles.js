@@ -25,7 +25,7 @@ export default function useBattles() {
     const loadData = async () => {
       try {
         if (DATA_SOURCE_URL) {
-          const response = await fetch(DATA_SOURCE_URL);
+          const response = await fetch(`${DATA_SOURCE_URL}?t=${Date.now()}`, { cache: "no-store" });
           const data = await response.json();
           if (data.battles) setBattles(data.battles);
           if (data.liveBattle) setLiveBattle(data.liveBattle);

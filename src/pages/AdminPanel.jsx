@@ -191,7 +191,7 @@ function AdminPanel() {
       <Header />
       
       <main className="max-w-7xl mx-auto px-6 md:px-12 lg:px-16 py-12">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+        <div className="sticky top-[68px] z-40 bg-[var(--bg-primary)]/80 backdrop-blur-md pb-6 mb-12 border-b border-[var(--accent)]/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <h1 className="text-4xl font-black text-[var(--accent)] tracking-tight">Admin Dashboard</h1>
           
           <div className="flex bg-[var(--accent)]/10 p-1 rounded-2xl border border-[var(--accent)]/20 overflow-x-auto no-scrollbar">
