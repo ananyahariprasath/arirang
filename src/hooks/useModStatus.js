@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { DATA_SOURCE_URL } from "../constants";
 
 const INITIAL_MODS = [
   {
@@ -77,15 +78,35 @@ const INITIAL_MODS = [
 
 export default function useModStatus() {
   const [mods, setMods] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const saved = localStorage.getItem("modStatusData");
-    if (saved) {
-      setMods(JSON.parse(saved));
-    } else {
-      setMods(INITIAL_MODS);
-      localStorage.setItem("modStatusData", JSON.stringify(INITIAL_MODS));
-    }
+    const loadData = async () => {
+      try {
+        if (DATA_SOURCE_URL) {
+          const response = await fetch(DATA_SOURCE_URL);
+          const data = await response.json();
+          if (data.mods) {
+            setMods(data.mods);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch mods:", error);
+      }
+
+      const saved = localStorage.getItem("modStatusData");
+      if (saved) {
+        setMods(JSON.parse(saved));
+      } else {
+        setMods(INITIAL_MODS);
+        localStorage.setItem("modStatusData", JSON.stringify(INITIAL_MODS));
+      }
+      setLoading(false);
+    };
+
+    loadData();
   }, []);
 
 
@@ -119,5 +140,6 @@ export default function useModStatus() {
     toggleStatus,
     updateModDetails,
     resetMods,
+    loading,
   };
 }

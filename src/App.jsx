@@ -9,15 +9,9 @@ import { ToastProvider } from "./context/ToastContext";
 
 import ErrorBoundary from "./components/utils/ErrorBoundary";
 
-const CrashTrigger = ({ shouldCrash }) => {
-  if (shouldCrash) throw new Error("Lavender Test Error! 💜");
-  return null;
-};
-
 function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [shouldCrash, setShouldCrash] = useState(false); 
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -59,15 +53,6 @@ function App() {
   return (
     <ErrorBoundary>
       <ToastProvider>
-        {/* Child that crashes if triggered */}
-        <CrashTrigger shouldCrash={shouldCrash} />
-        {/* Hidden test error trigger (only for your testing) */}
-        <div 
-          onClick={() => setShouldCrash(true)}
-          className="fixed top-0 left-0 w-10 h-10 opacity-0 cursor-default z-[9999]"
-          title="Lavender Test Trigger"
-        />
-
         {isAdminOpen ? (
           <>
             <AdminPanel />

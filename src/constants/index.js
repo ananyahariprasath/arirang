@@ -147,3 +147,7 @@ export const PRESAVE_LINKS = {
   spotify: "https://open.spotify.com/prerelease/1DcxHW214MCDxXju71RbvX?si=07b5e009c3ee4c0b",
   appleMusic: "https://music.apple.com/us/album/arirang/1868862375"
 };
+
+// URL for live global updates (e.g., a GitHub Gist raw URL)
+// If empty, the app will use local data.json and localStorage
+export const DATA_SOURCE_URL = ""; 

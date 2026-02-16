@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { DATA_SOURCE_URL } from "../constants";
 
 const INITIAL_TIMELINE = [
   { id: 1, date: "March 20", time: "13:00", platform: "YouTube", event: "Official MV Release & Premiere" },
@@ -11,15 +12,35 @@ const INITIAL_TIMELINE = [
 
 export default function useTimeline() {
   const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const saved = localStorage.getItem("timelineData");
-    if (saved) {
-      setEvents(JSON.parse(saved));
-    } else {
-      setEvents(INITIAL_TIMELINE);
-      localStorage.setItem("timelineData", JSON.stringify(INITIAL_TIMELINE));
-    }
+    const loadData = async () => {
+      try {
+        if (DATA_SOURCE_URL) {
+          const response = await fetch(DATA_SOURCE_URL);
+          const data = await response.json();
+          if (data.timeline) {
+            setEvents(data.timeline);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch timeline:", error);
+      }
+
+      const saved = localStorage.getItem("timelineData");
+      if (saved) {
+        setEvents(JSON.parse(saved));
+      } else {
+        setEvents(INITIAL_TIMELINE);
+        localStorage.setItem("timelineData", JSON.stringify(INITIAL_TIMELINE));
+      }
+      setLoading(false);
+    };
+
+    loadData();
   }, []);
 
   const addEvent = (newEvent) => {
@@ -47,5 +68,5 @@ export default function useTimeline() {
     localStorage.setItem("timelineData", JSON.stringify(INITIAL_TIMELINE));
   };
 
-  return { events, addEvent, deleteEvent, clearTimeline, resetToDefault };
+  return { events, addEvent, deleteEvent, clearTimeline, resetToDefault, loading };
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { DATA_SOURCE_URL } from "../constants";
 
 const INITIAL_BATTLES = [
   { id: 1, date: "2026-02-15", time: "22:00", regions: ["India", "Korea", "USA"], target: "15M" },
@@ -18,19 +19,39 @@ const INITIAL_LIVE = {
 export default function useBattles() {
   const [battles, setBattles] = useState([]);
   const [liveBattle, setLiveBattle] = useState(INITIAL_LIVE);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load from localStorage
-    const saved = localStorage.getItem("battleData");
-    if (saved) setBattles(JSON.parse(saved));
-    else {
-      setBattles(INITIAL_BATTLES);
-      localStorage.setItem("battleData", JSON.stringify(INITIAL_BATTLES));
-    }
+    const loadData = async () => {
+      try {
+        if (DATA_SOURCE_URL) {
+          const response = await fetch(DATA_SOURCE_URL);
+          const data = await response.json();
+          if (data.battles) setBattles(data.battles);
+          if (data.liveBattle) setLiveBattle(data.liveBattle);
+          if (data.battles || data.liveBattle) {
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch battles:", error);
+      }
 
-    const savedLive = localStorage.getItem("liveBattle");
-    if (savedLive) setLiveBattle(JSON.parse(savedLive));
-    else localStorage.setItem("liveBattle", JSON.stringify(INITIAL_LIVE));
+      const saved = localStorage.getItem("battleData");
+      if (saved) setBattles(JSON.parse(saved));
+      else {
+        setBattles(INITIAL_BATTLES);
+        localStorage.setItem("battleData", JSON.stringify(INITIAL_BATTLES));
+      }
+
+      const savedLive = localStorage.getItem("liveBattle");
+      if (savedLive) setLiveBattle(JSON.parse(savedLive));
+      else localStorage.setItem("liveBattle", JSON.stringify(INITIAL_LIVE));
+      setLoading(false);
+    };
+
+    loadData();
   }, []);
 
   const addBattle = (newBattle) => {
@@ -55,5 +76,5 @@ export default function useBattles() {
     localStorage.removeItem("battleData");
   };
 
-  return { battles, liveBattle, addBattle, updateLiveBattle, deleteBattle, clearBattles };
+  return { battles, liveBattle, addBattle, updateLiveBattle, deleteBattle, clearBattles, loading };
 }

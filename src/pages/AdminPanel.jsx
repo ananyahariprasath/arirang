@@ -10,11 +10,13 @@ import { REGION_PRESETS, COUNTRY_REGION_MAP, COUNTRIES } from "../constants";
 function AdminPanel() {
   const [activeTab, setActiveTab] = useState("tickets");
   const [tickets, setTickets] = useState([]);
-  const { battles, liveBattle, addBattle, updateLiveBattle, deleteBattle, clearBattles } = useBattles();
-  const { events, addEvent, deleteEvent, clearTimeline, resetToDefault } = useTimeline();
-  const { regions, addRegion, deleteRegion, resetRegions } = useRegionalData();
-  const { mods, toggleStatus, updateModDetails, resetMods } = useModStatus();
+  const { battles, liveBattle, addBattle, updateLiveBattle, deleteBattle, clearBattles, loading: battlesLoading } = useBattles();
+  const { events, addEvent, deleteEvent, clearTimeline, resetToDefault, loading: timelineLoading } = useTimeline();
+  const { regions, addRegion, deleteRegion, resetRegions, loading: regionsLoading } = useRegionalData();
+  const { mods, toggleStatus, updateModDetails, resetMods, loading: modsLoading } = useModStatus();
   const toast = useToast();
+
+  const isDataLoading = regionsLoading || modsLoading || battlesLoading || timelineLoading;
   
   // New Battle History Form State
   const [newBattle, setNewBattle] = useState({
@@ -222,6 +224,12 @@ function AdminPanel() {
               className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === "mods" ? "bg-[var(--accent)] text-white shadow-lg" : "opacity-60 hover:opacity-100"}`}
             >
               Mod Manager
+            </button>
+            <button 
+              onClick={() => setActiveTab("global")}
+              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === "global" ? "bg-[var(--accent)] text-white shadow-lg" : "opacity-60 hover:opacity-100"}`}
+            >
+              Global Config
             </button>
           </div>
         </div>
@@ -776,6 +784,16 @@ function AdminPanel() {
             toast={toast}
           />
         )}
+        {activeTab === "global" && (
+          <GlobalConfigSection 
+            regions={regions} 
+            mods={mods} 
+            battles={battles}
+            liveBattle={liveBattle}
+            timeline={events}
+            toast={toast}
+          />
+        )}
       </main>
     </div>
   );
@@ -888,6 +906,38 @@ function ModManagerSection({ mods, toggleStatus, updateModDetails, resetMods, to
             toast={toast}
           />
         ))}
+      </div>
+    </section>
+  );
+}
+
+function GlobalConfigSection({ regions, mods, battles, liveBattle, timeline, toast }) {
+  const config = JSON.stringify({ regions, mods, battles, liveBattle, timeline }, null, 2);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(config);
+    toast.show("JSON Config copied to clipboard! 📋💜", "success");
+  };
+
+  return (
+    <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h2 className="text-2xl font-bold">Global Configuration</h2>
+          <p className="text-xs opacity-50 mt-1">Copy this JSON and host it as a GitHub Gist to push updates to all users.</p>
+        </div>
+        <button 
+          onClick={handleCopy}
+          className="bg-[var(--accent)] text-white font-black px-6 py-2 rounded-xl shadow-lg hover:scale-[1.05] transition-all flex items-center gap-2"
+        >
+          <span>📋</span> COPY JSON
+        </button>
+      </div>
+
+      <div className="bg-black/40 p-6 rounded-3xl border border-[var(--accent)]/20 shadow-2xl">
+        <pre className="text-[10px] md:text-sm font-mono overflow-x-auto max-h-[500px] overflow-y-auto whitespace-pre-wrap text-[var(--accent)]/80">
+          {config}
+        </pre>
       </div>
     </section>
   );
