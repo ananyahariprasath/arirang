@@ -5,9 +5,11 @@ function CountryDropdown({ selectedCountry, onSelect, disabled = false }) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const filteredCountries = COUNTRIES.filter((country) =>
-    country.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCountries = COUNTRIES
+    .filter((country) =>
+      country.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => a.localeCompare(b));
 
   return (
     <div className={`w-full flex justify-center mt-6 relative transition-all duration-500 ${disabled ? "opacity-40 grayscale-[0.5]" : "opacity-100"}`}>

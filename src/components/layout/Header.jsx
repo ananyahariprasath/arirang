@@ -24,7 +24,7 @@ function Header() {
 
           {/* Center Project Name */}
           <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-sm sm:text-lg md:text-2xl font-bold tracking-widest text-center whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] sm:max-w-xs md:max-w-md">
-            ARIRARIRANG!!
+            ARIRANG SPOTIFY TAKEOVER!!!
           </div>
 
           {/* Right Section - Desktop */}

@@ -8,6 +8,7 @@ import ContactSupport from "../components/section-2/ContactSupport";
 import Timeline from "../components/post-expiry/Timeline";
 import StreamingBattle from "../components/post-expiry/StreamingBattle";
 import SupportDrawer from "../components/ui/SupportDrawer";
+import RecentResultsDrawer from "../components/ui/RecentResultsDrawer";
 
 
 function Home() {
@@ -79,6 +80,9 @@ function Home() {
 
       {/* Slideable Support Drawer (Only in Expired state) */}
       {isExpired && <SupportDrawer />}
+
+      {/* Recent Results Drawer — slides up from bottom (Only in Expired state) */}
+      {isExpired && <RecentResultsDrawer />}
 
       {isModalOpen && (
         <CountryModal

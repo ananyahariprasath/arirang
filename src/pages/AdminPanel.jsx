@@ -5,12 +5,12 @@ import useTimeline from "../hooks/useTimeline";
 import useRegionalData from "../hooks/useRegionalData";
 import useModStatus from "../hooks/useModStatus";
 import { useToast } from "../context/ToastContext";
-import { REGION_PRESETS, COUNTRY_REGION_MAP, COUNTRIES } from "../constants";
+import { COUNTRY_PRESETS, COUNTRY_REGION_MAP, COUNTRIES, COUNTRY_TZ_MAP } from "../constants";
 
 function AdminPanel() {
   const [activeTab, setActiveTab] = useState("tickets");
   const [tickets, setTickets] = useState([]);
-  const { battles, liveBattle, addBattle, updateLiveBattle, deleteBattle, clearBattles, loading: battlesLoading } = useBattles();
+  const { battles, liveBattles, addBattle, updateLiveBattles, deleteBattle, clearBattles, loading: battlesLoading } = useBattles();
   const { events, addEvent, deleteEvent, clearTimeline, resetToDefault, loading: timelineLoading } = useTimeline();
   const { regions, addRegion, deleteRegion, resetRegions, loading: regionsLoading } = useRegionalData();
   const { mods, toggleStatus, updateModDetails, resetMods, loading: modsLoading } = useModStatus();
@@ -26,8 +26,8 @@ function AdminPanel() {
     target: ""
   });
 
-  // Live Battle Editor State
-  const [liveEdit, setLiveEdit] = useState(liveBattle);
+  // Live Battles Editor State (one entry per live battle)
+  const [liveEdits, setLiveEdits] = useState(liveBattles);
 
   // New Timeline Event State
   const [newEvent, setNewEvent] = useState({
@@ -42,13 +42,14 @@ function AdminPanel() {
     country: "",
     region: "",
     hashtag: "",
+    tz: "",
     spotifyReset: "",
     appleReset: "",
     gFormUrl: "",
     playlists: { spotify: [], appleMusic: [] }
   });
 
-  // Structured Playlist State (6 slots each)
+  // Structured Playlist State (6 slots)
   const [spotifyPlaylists, setSpotifyPlaylists] = useState(Array(6).fill({ name: "", url: "" }));
   const [applePlaylists, setApplePlaylists] = useState(Array(6).fill({ name: "", url: "" }));
 
@@ -56,8 +57,8 @@ function AdminPanel() {
   const [showCountryDrop, setShowCountryDrop] = useState(false);
 
   useEffect(() => {
-    setLiveEdit(liveBattle);
-  }, [liveBattle]);
+    setLiveEdits(liveBattles);
+  }, [JSON.stringify(liveBattles)]);
 
   useEffect(() => {
     // Load tickets from localStorage
@@ -138,21 +139,22 @@ function AdminPanel() {
     toast.show("Regional Info Saved! 💜", "success");
     
     // Reset Form
-    setNewRegion({ country: "", region: "", hashtag: "", spotifyReset: "", appleReset: "", gFormUrl: "", playlists: { spotify: [], appleMusic: [] } });
+    setNewRegion({ country: "", region: "", hashtag: "", tz: "", spotifyReset: "", appleReset: "", gFormUrl: "", playlists: { spotify: [], appleMusic: [] } });
     setSpotifyPlaylists(Array(6).fill({ name: "", url: "" }));
     setApplePlaylists(Array(6).fill({ name: "", url: "" }));
     setCountrySearch("");
     setShowCountryDrop(false);
   };
 
-  const handleRegionChange = (val) => {
-    const preset = REGION_PRESETS[val];
+  const handlePresetChange = (val) => {
+    const preset = COUNTRY_PRESETS[val];
     if (preset) {
       setNewRegion({
         ...newRegion,
-        region: val,
+        region: COUNTRY_REGION_MAP[val] || val, // If we selected a country from presets, try to get its region
+        tz: preset.tz,
         spotifyReset: preset.s,
-        appleReset: preset.a
+        appleReset: preset.a || ""
       });
     } else {
       setNewRegion({...newRegion, region: val});
@@ -161,12 +163,15 @@ function AdminPanel() {
 
   const handleCountrySelect = (country) => {
     const region = COUNTRY_REGION_MAP[country] || "";
-    const preset = REGION_PRESETS[region];
+    // Priority: Specific country preset -> General region preset (mapped) -> Current state
+    const preset = COUNTRY_PRESETS[country] || (region ? COUNTRY_PRESETS[region] : null);
+    const countryTz = COUNTRY_TZ_MAP[country];
     
     setNewRegion({
       ...newRegion,
       country,
       region: region,
+      tz: countryTz || (preset ? preset.tz : newRegion.tz),
       spotifyReset: preset ? preset.s : newRegion.spotifyReset,
       appleReset: preset ? preset.a : newRegion.appleReset
     });
@@ -174,16 +179,16 @@ function AdminPanel() {
     setShowCountryDrop(false);
   };
 
-  const updatePlaylist = (platform, index, field, value) => {
-    if (platform === "spotify") {
-      const updated = [...spotifyPlaylists];
-      updated[index] = { ...updated[index], [field]: value };
-      setSpotifyPlaylists(updated);
-    } else {
-      const updated = [...applePlaylists];
-      updated[index] = { ...updated[index], [field]: value };
-      setApplePlaylists(updated);
-    }
+  const updatePlaylist = (index, field, value) => {
+    const updated = [...spotifyPlaylists];
+    updated[index] = { ...updated[index], [field]: value };
+    setSpotifyPlaylists(updated);
+  };
+
+  const updateApplePlaylist = (index, field, value) => {
+    const updated = [...applePlaylists];
+    updated[index] = { ...updated[index], [field]: value };
+    setApplePlaylists(updated);
   };
 
   return (
@@ -344,51 +349,80 @@ function AdminPanel() {
               {/* Right Sidebar: Editors */}
               <div className="flex flex-col gap-8 h-fit lg:sticky lg:top-12">
                 
-                {/* 1. Live Battle Editor */}
-                <div className="bg-[var(--card-bg)]/80 backdrop-blur-2xl p-6 rounded-3xl border border-[var(--accent)]/40 shadow-xl">
-                  <h3 className="text-lg font-black mb-4 uppercase tracking-tight text-[var(--accent)] flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-                    Live Battle Editor
-                  </h3>
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-[9px] font-black uppercase opacity-40 ml-1">Battle Title</label>
-                      <input 
-                        type="text" 
-                        value={liveEdit.title}
-                        onChange={(e) => setLiveEdit({...liveEdit, title: e.target.value})}
-                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
+                {/* 1. Live Battles Editor — one card per battle */}
+                {liveEdits.map((lb, i) => (
+                  <div key={lb.id} className="bg-[var(--card-bg)]/80 backdrop-blur-2xl p-6 rounded-3xl border border-[var(--accent)]/40 shadow-xl">
+                    <h3 className="text-sm font-black mb-3 uppercase tracking-tight text-[var(--accent)] flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                      Live Battle {i + 1}
+                    </h3>
+                    <div className="space-y-2">
                       <div>
-                        <label className="text-[9px] font-black uppercase opacity-40 ml-1">Target Goal</label>
-                        <input 
-                          type="text" 
-                          value={liveEdit.goal}
-                          onChange={(e) => setLiveEdit({...liveEdit, goal: e.target.value})}
-                          className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                        <label className="text-[9px] font-black uppercase opacity-40 ml-1">Title</label>
+                        <input
+                          type="text"
+                          value={lb.title}
+                          onChange={(e) => {
+                            const updated = [...liveEdits];
+                            updated[i] = { ...updated[i], title: e.target.value };
+                            setLiveEdits(updated);
+                          }}
+                          className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
                         />
                       </div>
-                      <div>
-                        <label className="text-[9px] font-black uppercase opacity-40 ml-1">Progress (%)</label>
-                        <input 
-                          type="number" 
-                          min="0" max="100"
-                          value={liveEdit.progress}
-                          onChange={(e) => setLiveEdit({...liveEdit, progress: parseInt(e.target.value) || 0})}
-                          className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
-                        />
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[9px] font-black uppercase opacity-40 ml-1">Goal</label>
+                          <input
+                            type="text"
+                            value={lb.goal}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], goal: e.target.value };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black uppercase opacity-40 ml-1">Progress %</label>
+                          <input
+                            type="number" min="0" max="100"
+                            value={lb.progress}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], progress: parseInt(e.target.value) || 0 };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black uppercase opacity-40 ml-1">Status</label>
+                          <select
+                            value={lb.status}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], status: e.target.value };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all appearance-none"
+                          >
+                            {["Surging", "On Track", "Heating Up", "Almost There"].map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => { updateLiveBattle(liveEdit); toast.show("Live stats updated! 💜", "success") }}
-                      className="w-full bg-[var(--accent)] text-white font-black py-3 rounded-xl text-xs shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all mt-2"
-                    >
-                      UPDATE LIVE STATS
-                    </button>
                   </div>
-                </div>
+                ))}
+                <button
+                  onClick={() => { updateLiveBattles(liveEdits); toast.show("All live battles updated! 💜", "success"); }}
+                  className="w-full bg-[var(--accent)] text-white font-black py-3 rounded-xl text-xs shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  UPDATE ALL LIVE BATTLES
+                </button>
 
                 {/* 2. Add Battle History Form */}
                 <div className="bg-[var(--card-bg)]/80 backdrop-blur-2xl p-6 rounded-3xl border border-[var(--accent)]/40 shadow-xl">
@@ -588,34 +622,40 @@ function AdminPanel() {
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
                         <div className="bg-black/10 p-3 rounded-xl">
-                          <span className="text-[9px] uppercase font-black opacity-40 block mb-1">Spotify Reset</span>
-                          <span className="font-bold">{r.spotifyReset}</span>
+                          <span className="text-[9px] uppercase font-black opacity-40 block mb-1">Timezone</span>
+                          <span className="font-bold">{r.tz || "UTC"}</span>
                         </div>
-                        <div className="bg-black/10 p-3 rounded-xl">
-                          <span className="text-[9px] uppercase font-black opacity-40 block mb-1">Apple Reset</span>
-                          <span className="font-bold">{r.appleReset}</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="bg-black/10 p-3 rounded-xl">
+                            <span className="text-[9px] uppercase font-black opacity-40 block mb-1">Spotify Reset</span>
+                            <span className="font-bold">{r.spotifyReset}</span>
+                          </div>
+                          <div className="bg-black/10 p-3 rounded-xl">
+                            <span className="text-[9px] uppercase font-black opacity-40 block mb-1">Apple Reset</span>
+                            <span className="font-bold">{r.appleReset || "N/A"}</span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex gap-2 border-t border-white/5 pt-4">
-                         <div className="flex-1">
-                            <span className="text-[9px] uppercase font-black opacity-40 block mb-2">Spotify Playlists</span>
-                            <div className="flex flex-wrap gap-1">
-                              {r.playlists.spotify?.map((p, i) => (
-                                <span key={i} className="text-[8px] px-2 py-1 bg-green-500/10 text-green-500 rounded-full font-bold">{p.name}</span>
-                              ))}
-                            </div>
-                         </div>
-                         <div className="flex-1">
-                            <span className="text-[9px] uppercase font-black opacity-40 block mb-2">Apple Playlists</span>
-                            <div className="flex flex-wrap gap-1">
-                              {r.playlists.appleMusic?.map((p, i) => (
-                                <span key={i} className="text-[8px] px-2 py-1 bg-red-500/10 text-red-500 rounded-full font-bold">{p.name}</span>
-                              ))}
-                            </div>
-                         </div>
+                      <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
+                        <div>
+                          <span className="text-[9px] uppercase font-black opacity-40 block mb-2">Spotify Playlists</span>
+                          <div className="flex flex-wrap gap-1">
+                            {r.playlists.spotify?.map((p, i) => (
+                              <span key={i} className="text-[8px] px-2 py-1 bg-green-500/10 text-green-500 rounded-full font-bold">{p.name}</span>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-[9px] uppercase font-black opacity-40 block mb-2">Apple Playlists</span>
+                          <div className="flex flex-wrap gap-1">
+                            {r.playlists.appleMusic?.map((p, i) => (
+                              <span key={i} className="text-[8px] px-2 py-1 bg-red-500/10 text-red-500 rounded-full font-bold">{p.name}</span>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -662,26 +702,38 @@ function AdminPanel() {
                         type="text" 
                         placeholder="South Asia"
                         value={newRegion.region}
-                        onChange={(e) => handleRegionChange(e.target.value)}
+                        onChange={(e) => handlePresetChange(e.target.value)}
                         className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
                         list="region-presets"
                       />
                       <datalist id="region-presets">
-                        {Object.keys(REGION_PRESETS).map(r => <option key={r} value={r} />)}
+                        {Object.keys(COUNTRY_PRESETS).map(r => <option key={r} value={r} />)}
                       </datalist>
                     </div>
                   </div>
-                  <div>
-                    <label className="text-[9px] font-black uppercase opacity-40 ml-1">Hashtags</label>
-                    <input 
-                      type="text" 
-                      placeholder="#BTS_India #SouthAsia_Stream"
-                      value={newRegion.hashtag}
-                      onChange={(e) => setNewRegion({...newRegion, hashtag: e.target.value})}
-                      className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
-                    />
-                  </div>
                   <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[9px] font-black uppercase opacity-40 ml-1">Hashtags</label>
+                      <input 
+                        type="text" 
+                        placeholder="#BTS_India #SouthAsia_Stream"
+                        value={newRegion.hashtag}
+                        onChange={(e) => setNewRegion({...newRegion, hashtag: e.target.value})}
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black uppercase opacity-40 ml-1">Timezone (IANA)</label>
+                      <input 
+                        type="text" 
+                        placeholder="Asia/Kolkata"
+                        value={newRegion.tz}
+                        onChange={(e) => setNewRegion({...newRegion, tz: e.target.value})}
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                      />
+                    </div>
+                  </div>
+                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-[9px] font-black uppercase opacity-40 ml-1">Spotify Reset</label>
                       <input 
@@ -715,51 +767,52 @@ function AdminPanel() {
                     />
                   </div>
                   
-                  <div className="border-t border-white/5 pt-4">
-                    <label className="text-[9px] font-black uppercase opacity-40 ml-1 block mb-3">Spotify Playlists (Max 6)</label>
-                    <div className="space-y-2">
-                      {spotifyPlaylists.map((p, i) => (
-                        <div key={i} className="flex gap-2">
-                          <input 
-                            type="text" 
-                            placeholder={`Name #${i+1}`}
-                            value={p.name}
-                            onChange={(e) => updatePlaylist("spotify", i, "name", e.target.value)}
-                            className="flex-[2] bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2 rounded-lg text-[10px] focus:outline-none focus:border-[var(--accent)] transition-all"
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="URL"
-                            value={p.url}
-                            onChange={(e) => updatePlaylist("spotify", i, "url", e.target.value)}
-                            className="flex-[3] bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2 rounded-lg text-[10px] focus:outline-none focus:border-[var(--accent)] transition-all"
-                          />
-                        </div>
-                      ))}
+                   <div className="grid grid-cols-1 gap-8 border-t border-white/5 pt-6">
+                    <div>
+                      <label className="text-[9px] font-black uppercase opacity-40 ml-1 block mb-3">Spotify Playlists (Max 6)</label>
+                      <div className="space-y-2">
+                        {spotifyPlaylists.map((p, i) => (
+                          <div key={i} className="flex gap-2">
+                            <input 
+                              type="text" 
+                              placeholder={`Name #${i+1}`}
+                              value={p.name}
+                              onChange={(e) => updatePlaylist(i, "name", e.target.value)}
+                              className="flex-[2] bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2 rounded-lg text-[10px] focus:outline-none focus:border-[var(--accent)] transition-all"
+                            />
+                            <input 
+                              type="text" 
+                              placeholder="URL"
+                              value={p.url}
+                              onChange={(e) => updatePlaylist(i, "url", e.target.value)}
+                              className="flex-[3] bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2 rounded-lg text-[10px] focus:outline-none focus:border-[var(--accent)] transition-all"
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="border-t border-white/5 pt-4">
-                    <label className="text-[9px] font-black uppercase opacity-40 ml-1 block mb-3">Apple Playlists (Max 6)</label>
-                    <div className="space-y-2">
-                      {applePlaylists.map((p, i) => (
-                        <div key={i} className="flex gap-2">
-                          <input 
-                            type="text" 
-                            placeholder={`Name #${i+1}`}
-                            value={p.name}
-                            onChange={(e) => updatePlaylist("apple", i, "name", e.target.value)}
-                            className="flex-[2] bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2 rounded-lg text-[10px] focus:outline-none focus:border-[var(--accent)] transition-all"
-                          />
-                          <input 
-                            type="text" 
-                            placeholder="URL"
-                            value={p.url}
-                            onChange={(e) => updatePlaylist("apple", i, "url", e.target.value)}
-                            className="flex-[3] bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2 rounded-lg text-[10px] focus:outline-none focus:border-[var(--accent)] transition-all"
-                          />
-                        </div>
-                      ))}
+                    <div>
+                      <label className="text-[9px] font-black uppercase opacity-40 ml-1 block mb-3">Apple Playlists (Max 6)</label>
+                      <div className="space-y-2">
+                        {applePlaylists.map((p, i) => (
+                          <div key={i} className="flex gap-2">
+                            <input 
+                              type="text" 
+                              placeholder={`Name #${i+1}`}
+                              value={p.name}
+                              onChange={(e) => updateApplePlaylist(i, "name", e.target.value)}
+                              className="flex-[2] bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2 rounded-lg text-[10px] focus:outline-none focus:border-[var(--accent)] transition-all"
+                            />
+                            <input 
+                              type="text" 
+                              placeholder="URL"
+                              value={p.url}
+                              onChange={(e) => updateApplePlaylist(i, "url", e.target.value)}
+                              className="flex-[3] bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2 rounded-lg text-[10px] focus:outline-none focus:border-[var(--accent)] transition-all"
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
@@ -789,7 +842,7 @@ function AdminPanel() {
             regions={regions} 
             mods={mods} 
             battles={battles}
-            liveBattle={liveBattle}
+            liveBattles={liveBattles}
             timeline={events}
             toast={toast}
           />
@@ -911,8 +964,8 @@ function ModManagerSection({ mods, toggleStatus, updateModDetails, resetMods, to
   );
 }
 
-function GlobalConfigSection({ regions, mods, battles, liveBattle, timeline, toast }) {
-  const config = JSON.stringify({ regions, mods, battles, liveBattle, timeline }, null, 2);
+function GlobalConfigSection({ regions, mods, battles, liveBattles, timeline, toast }) {
+  const config = JSON.stringify({ regions, mods, battles, liveBattles, timeline }, null, 2);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(config);

@@ -4,8 +4,9 @@
       "country": "India",
       "region": "South Asia",
       "hashtag": "#BTS_India #SouthAsia_Stream #PurpleProject",
-      "spotifyReset": "12:30 AM IST",
-      "appleReset": "1:30 AM IST",
+      "tz": "Asia/Kolkata",
+      "spotifyReset": "12:30 AM",
+      "appleReset": "1:30 AM",
       "playlists": {
         "spotify": [
           { "name": "Top 50 India", "url": "https://open.spotify.com/playlist/37i9dQZECXcR7U" },
@@ -30,8 +31,9 @@
       "country": "USA",
       "region": "North America",
       "hashtag": "#BTS_USA #NorthAsia_Stream #BillboardProject",
-      "spotifyReset": "12:00 AM ET",
-      "appleReset": "1:00 AM ET",
+      "tz": "America/New_York",
+      "spotifyReset": "12:00 AM",
+      "appleReset": "1:00 AM",
       "playlists": {
         "spotify": [
           { "name": "Today's Top Hits", "url": "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM3M" },
@@ -56,8 +58,9 @@
       "country": "Australia",
       "region": "Oceania",
       "hashtag": "#BTS_Australia #Oceania_Stream #PurpleProject",
-      "spotifyReset": "12:00 AM AEST",
-      "appleReset": "1:00 AM AEST",
+      "tz": "Australia/Sydney",
+      "spotifyReset": "12:00 AM",
+      "appleReset": "1:00 AM",
       "playlists": {
         "spotify": [
           { "name": "Top 50 Australia", "url": "https://open.spotify.com/playlist/37i9dQZEVXbJP76IRPzd9t" },
@@ -160,6 +163,12 @@
     { "id": 4, "date": "2026-02-14", "time": "14:00", "regions": ["Europe", "L-Am"], "target": "8M" },
     { "id": 5, "date": "2026-02-13", "time": "20:00", "regions": ["Global"], "target": "100M" },
     { "id": 6, "date": "2026-02-12", "time": "21:00", "regions": ["USA", "Canada"], "target": "12M" }
+  ],
+  "liveBattles": [
+    { "id": "lb1", "title": "Butter vs Dynamite", "goal": "200M", "progress": 85, "platform": "Spotify", "status": "Surging" },
+    { "id": "lb2", "title": "DNA vs Boy With Luv", "goal": "150M", "progress": 62, "platform": "YouTube", "status": "On Track" },
+    { "id": "lb3", "title": "FAKE LOVE vs Spring Day", "goal": "80M", "progress": 41, "platform": "Apple Music", "status": "Heating Up" },
+    { "id": "lb4", "title": "MIC Drop vs Not Today", "goal": "50M", "progress": 78, "platform": "Global", "status": "Almost There" }
   ],
   "liveBattle": {
     "title": "Butter vs Dynamite",
