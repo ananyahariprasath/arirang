@@ -23,7 +23,7 @@ function Header() {
           </div>
 
           {/* Center Project Name */}
-          <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 text-sm sm:text-lg md:text-2xl font-bold tracking-widest text-center whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] sm:max-w-xs md:max-w-md">
+          <div className="flex-1 min-w-0 text-center px-2 text-sm sm:text-lg md:text-2xl font-bold tracking-normal sm:tracking-widest uppercase leading-tight md:leading-normal whitespace-normal">
             ARIRANG SPOTIFY TAKEOVER!!!
           </div>
 
