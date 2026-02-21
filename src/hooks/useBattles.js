@@ -1,20 +1,13 @@
 import { useState, useEffect } from "react";
 import { DATA_SOURCE_URL } from "../constants";
 
-const INITIAL_BATTLES = [
-  { id: 1, date: "2026-02-15", time: "22:00", regions: ["India", "Korea", "USA"], target: "15M" },
-  { id: 2, date: "2026-02-15", time: "18:00", regions: ["Global"], target: "50M" },
-  { id: 3, date: "2026-02-14", time: "23:00", regions: ["Japan", "SE Asia"], target: "10M" },
-  { id: 4, date: "2026-02-14", time: "14:00", regions: ["Europe", "L-Am"], target: "8M" },
-  { id: 5, date: "2026-02-13", time: "20:00", regions: ["Global"], target: "100M" },
-  { id: 6, date: "2026-02-12", time: "21:00", regions: ["USA", "Canada"], target: "12M" },
-];
+const INITIAL_BATTLES = [];
 
 const INITIAL_LIVE_BATTLES = [
-  { id: "lb1", title: "South Asia vs Africa", goal: "200M", progress: 85, platform: "Spotify", status: "Surging" },
-  { id: "lb2", title: "Oceania vs West Asia", goal: "150M", progress: 62, platform: "Spotify", status: "On Track" },
-  { id: "lb3", title: "North America vs South & Central America", goal: "80M", progress: 41, platform: "Spotify", status: "Heating Up" },
-  { id: "lb4", title: "Europe vs East & South East Asia", goal: "50M", progress: 78, platform: "Spotify", status: "Almost There" },
+  { id: "lb1", title: "SOUTH ASIA vs AFRICA", goal: "320M", progress: 0, platform: "Spotify", status: "Yet to Start" },
+  { id: "lb2", title: "OCEANIA vs WEST ASIA", goal: "320M", progress: 0, platform: "Spotify", status: "Yet to Start" },
+  { id: "lb3", title: "NORTH AMERICA vs SOUTH & CENTRAL AMERICA", goal: "320M", progress: 0, platform: "Spotify", status: "Yet to Start" },
+  { id: "lb4", title: "EUROPE vs EAST & SOUTH EAST ASIA", goal: "320M", progress: 0, platform: "Spotify", status: "Yet to Start" },
 ];
 
 export default function useBattles() {
@@ -78,8 +71,19 @@ export default function useBattles() {
     localStorage.removeItem("battleData");
   };
 
+  const updateBattle = (id, changes) => {
+    const updated = battles.map(b => b.id === id ? { ...b, ...changes } : b);
+    setBattles(updated);
+    localStorage.setItem("battleData", JSON.stringify(updated));
+  };
+
+  const resetLiveBattles = () => {
+    setLiveBattles(INITIAL_LIVE_BATTLES);
+    localStorage.setItem("liveBattles", JSON.stringify(INITIAL_LIVE_BATTLES));
+  };
+
   // liveBattle kept for backward compat
   const liveBattle = liveBattles[0] ?? INITIAL_LIVE_BATTLES[0];
 
-  return { battles, liveBattle, liveBattles, addBattle, updateLiveBattles, deleteBattle, clearBattles, loading };
+  return { battles, liveBattle, liveBattles, addBattle, updateBattle, updateLiveBattles, deleteBattle, clearBattles, resetLiveBattles, loading };
 }

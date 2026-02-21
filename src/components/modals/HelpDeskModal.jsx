@@ -57,50 +57,17 @@ function HelpDeskModal({ isOpen, onClose }) {
 
               {/* Platforms */}
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <a
-                  href={mod.links.x}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-center py-1.5 rounded-lg border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 transition"
-                >
-                  X
-                </a>
-
-                <a
-                  href={mod.links.instagram}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-center py-1.5 rounded-lg border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 transition"
-                >
-                  Instagram
-                </a>
-
-                <a
-                  href={mod.links.weverse}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-center py-1.5 rounded-lg border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 transition"
-                >
-                  Weverse
-                </a>
-
-                <a
-                  href={mod.links.facebook}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-center py-1.5 rounded-lg border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 transition"
-                >
-                  Facebook
-                </a>
-
-                <a
-                  href={mod.links.telegram}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="col-span-2 block text-center py-1.5 rounded-lg border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 transition"
-                >
-                  Telegram
-                </a>
+                {(mod.accounts || []).slice(0, 2).map((acc, i) => (
+                  <a
+                    key={i}
+                    href={acc.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`block text-center py-1.5 rounded-lg border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 transition ${i === 2 ? 'col-span-2' : ''}`}
+                  >
+                    {acc.platform || 'Link'}
+                  </a>
+                ))}
               </div>
             </div>
           ))}

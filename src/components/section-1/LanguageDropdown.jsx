@@ -27,10 +27,10 @@ function LanguageDropdown() {
   );
 
   return (
-    <div className="relative mt-8 w-full group">
+    <div className="relative w-full group">
       
       {/* Intro Sentence */}
-      <p className="text-xs md:text-sm font-bold opacity-80 mb-3 text-center animate-in fade-in slide-in-from-bottom-2">
+      <p className="text-[10px] md:text-xs font-bold opacity-80 mb-1 text-center animate-in fade-in slide-in-from-bottom-2">
         Connect with us at the comfort of your own language <span className="text-[var(--accent)]">💜</span>
       </p>
 
@@ -44,8 +44,8 @@ function LanguageDropdown() {
                    bg-[var(--card-bg)]/40
                    backdrop-blur-xl
                    border border-[var(--accent)]/40
-                   rounded-2xl
-                   px-5 py-2.5
+                   rounded-xl
+                   px-4 py-2
                    flex justify-between items-center
                    transition-all duration-300
                    hover:border-[var(--accent)]

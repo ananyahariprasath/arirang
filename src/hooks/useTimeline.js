@@ -68,5 +68,11 @@ export default function useTimeline() {
     localStorage.setItem("timelineData", JSON.stringify(INITIAL_TIMELINE));
   };
 
-  return { events, addEvent, deleteEvent, clearTimeline, resetToDefault, loading };
+  const updateEvent = (id, changes) => {
+    const updated = events.map(e => e.id === id ? { ...e, ...changes } : e);
+    setEvents(updated);
+    localStorage.setItem("timelineData", JSON.stringify(updated));
+  };
+
+  return { events, addEvent, updateEvent, deleteEvent, clearTimeline, resetToDefault, loading };
 }

@@ -1,84 +1,39 @@
 {
   "regions": [
     {
+      "country": "Global",
+      "region": "Global",
+      "goal": "Global domination and #1 on Spotify Global Top 50.",
+      "tz": "UTC",
+      "spotifyReset": "12:00 AM",
+      "appleReset": "1:00 AM",
+      "gFormUrl": "https://forms.gle/global_stream_proof"
+    },
+    {
       "country": "India",
       "region": "South Asia",
-      "hashtag": "#BTS_India #SouthAsia_Stream #PurpleProject",
+      "goal": "Reach #1 on Top 50 India and 5M streams in 24H.",
       "tz": "Asia/Kolkata",
       "spotifyReset": "12:30 AM",
       "appleReset": "1:30 AM",
-      "playlists": {
-        "spotify": [
-          { "name": "Top 50 India", "url": "https://open.spotify.com/playlist/37i9dQZECXcR7U" },
-          { "name": "BTS Essentials", "url": "https://open.spotify.com/playlist/37i9dQZF1DWY6t8ST7S7lD" },
-          { "name": "Global Viral 50", "url": "https://open.spotify.com/playlist/37i9dQZEVXbLiRS9vS9v9" },
-          { "name": "This is BTS", "url": "https://open.spotify.com/playlist/37i9dQZF1DX086nd7TYp8B" },
-          { "name": "K-Pop ON!", "url": "https://open.spotify.com/playlist/37i9dQZF1DX9t9mB6uMbiG" },
-          { "name": "Boy In Luv", "url": "https://open.spotify.com/playlist/37i9dQZF1DX390J0L8O981" }
-        ],
-        "apple": [
-          { "name": "Today's Hits", "url": "https://music.apple.com/in/playlist/todays-hits/pl.f4d115fae05342fc96c216c7fb773663" },
-          { "name": "K-Pop Today", "url": "https://music.apple.com/in/playlist/k-pop-today/pl.70f6ca777421457bab7336d36e788819" },
-          { "name": "BTS Essentials", "url": "https://music.apple.com/in/playlist/bts-essentials/pl.abc0f4d36098492095874287c7849e89" },
-          { "name": "Top 100: India", "url": "https://music.apple.com/in/playlist/top-100-india/pl.27d92f702f2d4e7492c01990c7467616" },
-          { "name": "Viral Hits", "url": "https://music.apple.com/in/playlist/viral-hits/pl.d952a225381846b0800c732f7961bcf6" },
-          { "name": "ARMY Selects", "url": "https://music.apple.com/in/playlist/army-selects/pl.6fb348e3519c4d29875f2b8f72c0c169" }
-        ]
-      },
       "gFormUrl": "https://forms.gle/global_stream_proof"
     },
     {
       "country": "USA",
       "region": "North America",
-      "hashtag": "#BTS_USA #NorthAsia_Stream #BillboardProject",
+      "goal": "Top 10 on Billboard Hot 100 and 10M streams.",
       "tz": "America/New_York",
       "spotifyReset": "12:00 AM",
       "appleReset": "1:00 AM",
-      "playlists": {
-        "spotify": [
-          { "name": "Today's Top Hits", "url": "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM3M" },
-          { "name": "Global Top 50", "url": "https://open.spotify.com/playlist/37i9dQZEVXbMDoHDwfs2tB" },
-          { "name": "BTS Billboard", "url": "https://open.spotify.com/playlist/37i9dQZF1DWY6t8ST7S7lD" },
-          { "name": "This is BTS", "url": "https://open.spotify.com/playlist/37i9dQZF1DX086nd7TYp8B" },
-          { "name": "Pop Rising", "url": "https://open.spotify.com/playlist/37i9dQZF1DX6aSa99997" },
-          { "name": "Hot Hits USA", "url": "https://open.spotify.com/playlist/37i9dQZF1DX0Yv686937" }
-        ],
-        "apple": [
-          { "name": "Today's Hits", "url": "https://music.apple.com/us/playlist/todays-hits/pl.f4d115fae05342fc96c216c7fb773663" },
-          { "name": "A-List K-Pop", "url": "https://music.apple.com/us/playlist/a-list-k-pop/pl.70f6ca777421457bab7336d36e788819" },
-          { "name": "BTS Essentials", "url": "https://music.apple.com/us/playlist/bts-essentials/pl.abc0f4d36098492095874287c7849e89" },
-          { "name": "Top 100: Global", "url": "https://music.apple.com/us/playlist/top-100-global/pl.d25f5d144192473c99026da234563673" },
-          { "name": "Pop Rocks", "url": "https://music.apple.com/us/playlist/pop-rocks/pl.d952a225381846b0800c732f7961bcf6" },
-          { "name": "Chart Toppers", "url": "https://music.apple.com/us/playlist/chart-toppers/pl.6fb348e3519c4d29875f2b8f72c0c169" }
-        ]
-      },
       "gFormUrl": "https://forms.gle/usa_stream_proof"
     },
     {
       "country": "Australia",
       "region": "Oceania",
-      "hashtag": "#BTS_Australia #Oceania_Stream #PurpleProject",
+      "goal": "Debut in Top 50 ARIA Charts.",
       "tz": "Australia/Sydney",
       "spotifyReset": "12:00 AM",
       "appleReset": "1:00 AM",
-      "playlists": {
-        "spotify": [
-          { "name": "Top 50 Australia", "url": "https://open.spotify.com/playlist/37i9dQZEVXbJP76IRPzd9t" },
-          { "name": "BTS Essentials", "url": "https://open.spotify.com/playlist/37i9dQZF1DWY6t8ST7S7lD" },
-          { "name": "Global Viral 50", "url": "https://open.spotify.com/playlist/37i9dQZEVXbLiRS9vS9v9" },
-          { "name": "This is BTS", "url": "https://open.spotify.com/playlist/37i9dQZF1DX086nd7TYp8B" },
-          { "name": "K-Pop ON!", "url": "https://open.spotify.com/playlist/37i9dQZF1DX9t9mB6uMbiG" },
-          { "name": "Front Left", "url": "https://open.spotify.com/playlist/37i9dQZF1DX390J0L8O981" }
-        ],
-        "apple": [
-          { "name": "Today's Hits", "url": "https://music.apple.com/au/playlist/todays-hits/pl.f4d115fae05342fc96c216c7fb773663" },
-          { "name": "A-List K-Pop", "url": "https://music.apple.com/au/playlist/k-pop-today/pl.70f6ca777421457bab7336d36e788819" },
-          { "name": "BTS Essentials", "url": "https://music.apple.com/au/playlist/bts-essentials/pl.abc0f4d36098492095874287c7849e89" },
-          { "name": "Top 100: Australia", "url": "https://music.apple.com/au/playlist/top-100-australia/pl.50e1ef71465e4492bf18029c7ec78e4d" },
-          { "name": "Viral Hits", "url": "https://music.apple.com/au/playlist/viral-hits/pl.d952a225381846b0800c732f7961bcf6" },
-          { "name": "Alternative", "url": "https://music.apple.com/au/playlist/alternative-essentials/pl.6fb348e3519c4d29875f2b8f72c0c169" }
-        ]
-      },
       "gFormUrl": "https://forms.gle/oceania_stream_proof"
     }
   ],
@@ -87,73 +42,55 @@
       "id": "mod-a",
       "name": "Mod A",
       "status": "online",
-      "links": {
-        "x": "https://x.com/moda",
-        "instagram": "https://instagram.com/moda",
-        "weverse": "https://weverse.io/moda",
-        "facebook": "https://facebook.com/moda",
-        "telegram": "https://t.me/moda"
-      }
+      "accounts": [
+        { "platform": "X", "url": "https://x.com/moda" },
+        { "platform": "Instagram", "url": "https://instagram.com/moda" }
+      ]
     },
     {
       "id": "mod-b",
       "name": "Mod B",
       "status": "online",
-      "links": {
-        "x": "https://x.com/modb",
-        "instagram": "https://instagram.com/modb",
-        "weverse": "https://weverse.io/modb",
-        "facebook": "https://facebook.com/modb",
-        "telegram": "https://t.me/modb"
-      }
+      "accounts": [
+        { "platform": "X", "url": "https://x.com/modb" },
+        { "platform": "Instagram", "url": "https://instagram.com/modb" }
+      ]
     },
     {
       "id": "mod-c",
       "name": "Mod C",
       "status": "online",
-      "links": {
-        "x": "https://x.com/modc",
-        "instagram": "https://instagram.com/modc",
-        "weverse": "https://weverse.io/modc",
-        "facebook": "https://facebook.com/modc",
-        "telegram": "https://t.me/modc"
-      }
+      "accounts": [
+        { "platform": "X", "url": "https://x.com/modc" },
+        { "platform": "Instagram", "url": "https://instagram.com/modc" }
+      ]
     },
     {
       "id": "mod-d",
       "name": "Mod D",
       "status": "online",
-      "links": {
-        "x": "https://x.com/modd",
-        "instagram": "https://instagram.com/modd",
-        "weverse": "https://weverse.io/modd",
-        "facebook": "https://facebook.com/modd",
-        "telegram": "https://t.me/modd"
-      }
+      "accounts": [
+        { "platform": "X", "url": "https://x.com/modd" },
+        { "platform": "Instagram", "url": "https://instagram.com/modd" }
+      ]
     },
     {
       "id": "mod-e",
       "name": "Mod E",
       "status": "online",
-      "links": {
-        "x": "https://x.com/mode",
-        "instagram": "https://instagram.com/mode",
-        "weverse": "https://weverse.io/mode",
-        "facebook": "https://facebook.com/mode",
-        "telegram": "https://t.me/mode"
-      }
+      "accounts": [
+        { "platform": "X", "url": "https://x.com/mode" },
+        { "platform": "Instagram", "url": "https://instagram.com/mode" }
+      ]
     },
     {
       "id": "mod-f",
       "name": "Mod F",
       "status": "online",
-      "links": {
-        "x": "https://x.com/modf",
-        "instagram": "https://instagram.com/modf",
-        "weverse": "https://weverse.io/modf",
-        "facebook": "https://facebook.com/modf",
-        "telegram": "https://t.me/modf"
-      }
+      "accounts": [
+        { "platform": "X", "url": "https://x.com/modf" },
+        { "platform": "Instagram", "url": "https://instagram.com/modf" }
+      ]
     }
   ],
   "battles": [
@@ -165,15 +102,15 @@
     { "id": 6, "date": "2026-02-12", "time": "21:00", "regions": ["USA", "Canada"], "target": "12M" }
   ],
   "liveBattles": [
-    { "id": "lb1", "title": "Butter vs Dynamite", "goal": "200M", "progress": 85, "platform": "Spotify", "status": "Surging" },
-    { "id": "lb2", "title": "DNA vs Boy With Luv", "goal": "150M", "progress": 62, "platform": "YouTube", "status": "On Track" },
-    { "id": "lb3", "title": "FAKE LOVE vs Spring Day", "goal": "80M", "progress": 41, "platform": "Apple Music", "status": "Heating Up" },
-    { "id": "lb4", "title": "MIC Drop vs Not Today", "goal": "50M", "progress": 78, "platform": "Global", "status": "Almost There" }
+    { "id": "lb1", "title": "SOUTH ASIA vs AFRICA", "goal": "320M", "progress": 0, "platform": "Spotify", "status": "-" },
+    { "id": "lb2", "title": "OCEANIA vs WEST ASIA", "goal": "320M", "progress": 0, "platform": "Spotify", "status": "-" },
+    { "id": "lb3", "title": "NORTH AMERICA vs SOUTH & CENTRAL AMERICA", "goal": "320M", "progress": 0, "platform": "Spotify", "status": "-" },
+    { "id": "lb4", "title": "EUROPE vs EAST & SOUTH EAST ASIA", "goal": "320M", "progress": 0, "platform": "Spotify", "status": "-" }
   ],
   "liveBattle": {
-    "title": "Butter vs Dynamite",
-    "goal": "200M",
-    "progress": 85
+    "title": "SOUTH ASIA vs AFRICA",
+    "goal": "320M",
+    "progress": 0
   },
   "timeline": [
     { "id": 1, "date": "March 20", "time": "13:00", "platform": "YouTube", "event": "Official MV Release & Premiere" },

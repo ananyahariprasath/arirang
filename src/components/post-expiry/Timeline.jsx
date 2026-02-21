@@ -18,7 +18,7 @@ function Timeline() {
       <div className="flex justify-between items-center mb-6 shrink-0">
         <div>
           <h2 className="text-2xl md:text-3xl font-black text-[var(--accent)] tracking-tighter">Streaming Map</h2>
-          <p className="text-[9px] uppercase tracking-widest font-black opacity-30">March 20 — March 27 Window</p>
+          <p className="text-[9px] uppercase tracking-widest font-black opacity-30">Streaming Timeline</p>
         </div>
         {/* <div className="hidden sm:flex gap-4">
           <div className="flex items-center gap-1.5">
@@ -74,21 +74,6 @@ function Timeline() {
         </div>
       </div>
 
-      {/* Map Legend (Mobile) */}
-      <div className="mt-6 pt-4 border-t border-[var(--accent)]/10 flex flex-wrap gap-4 sm:hidden shrink-0">
-        <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-          <span className="text-[9px] font-bold opacity-60 uppercase">YouTube</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#1DB954]"></div>
-          <span className="text-[9px] font-bold opacity-60 uppercase">Spotify</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#FA2D48]"></div>
-          <span className="text-[9px] font-bold opacity-60 uppercase">Apple Music</span>
-        </div>
-      </div>
     </div>
   );
 }

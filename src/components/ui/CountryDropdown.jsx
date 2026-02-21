@@ -12,34 +12,31 @@ function CountryDropdown({ selectedCountry, onSelect, disabled = false }) {
     .sort((a, b) => a.localeCompare(b));
 
   return (
-    <div className={`w-full flex justify-center mt-6 relative transition-all duration-500 ${disabled ? "opacity-40 grayscale-[0.5]" : "opacity-100"}`}>
-      <div className="w-[95%] md:w-[70%] lg:w-[50%] relative">
+    <div className="w-full relative transition-all duration-500">
+      <div className="w-full relative">
 
         {/* Dropdown Button */}
         <button
           onClick={() => {
-            if (disabled) return;
             setOpen(!open);
             setSearchTerm(""); // Reset search when opening/closing
           }}
-          disabled={disabled}
           className={`w-full
            bg-[var(--card-bg)]/30
            backdrop-blur-2xl
            border border-[var(--accent)]/50
            text-[var(--text-primary)]
-           rounded-2xl px-6 py-4
-           shadow-[0_8px_32px_0_rgba(200,162,255,0.2),0_0_0_1px_rgba(200,162,255,0.1)_inset]
+           rounded-xl px-4 py-3
+           shadow-[0_4px_20px_0_rgba(200,162,255,0.1)]
            flex justify-between items-center
            transition-all duration-300
-           ${disabled ? "cursor-not-allowed" : "hover:border-[var(--accent)]/80 hover:shadow-[0_12px_48px_0_rgba(200,162,255,0.35),0_0_0_1px_rgba(200,162,255,0.2)_inset] hover:bg-[var(--card-bg)]/40"}`}
-
+           hover:border-[var(--accent)] hover:bg-[var(--card-bg)]/40`}
         >
-          <span className="font-bold tracking-tight">
-            {disabled ? "Streaming Dashboard Locked" : selectedCountry}
+          <span className="font-bold tracking-tight text-xs md:text-sm uppercase">
+            {selectedCountry}
           </span>
-          <span className={`transition-transform duration-300 ${open ? "rotate-180" : ""} ${disabled ? "opacity-20" : ""}`}>
-            {disabled ? "🔒" : "▾"}
+          <span className={`transition-transform duration-300 ${open ? "rotate-180" : ""}`}>
+            ▾
           </span>
         </button>
 

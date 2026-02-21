@@ -556,86 +556,82 @@ export const COUNTRIES = [
   "Zimbabwe"
 ];
 
+export const FOCUS_PLAYLISTS = {
+  spotify: [
+    { name: "Top 50 India", url: "https://open.spotify.com/playlist/37i9dQZECXcR7U" },
+    { name: "BTS Essentials", url: "https://open.spotify.com/playlist/37i9dQZF1DWY6t8ST7S7lD" },
+    { name: "Global Viral 50", url: "https://open.spotify.com/playlist/37i9dQZEVXbLiRS9vS9v9" },
+    { name: "This is BTS", url: "https://open.spotify.com/playlist/37i9dQZF1DX086nd7TYp8B" },
+    { name: "K-Pop ON!", url: "https://open.spotify.com/playlist/37i9dQZF1DX9t9mBzbzhCt" },
+    { name: "Hot Hits India", url: "https://open.spotify.com/playlist/37i9dQZF1DX0XUsKBCl9jG" },
+    { name: "Today's Top Hits", url: "https://open.spotify.com/playlist/37i9dQZF1DXcBWf9p4H7hp" },
+    { name: "Pop Rising", url: "https://open.spotify.com/playlist/37i9dQZF1DX6Sa99U30mB" },
+    { name: "New Music Friday", url: "https://open.spotify.com/playlist/37i9dQZF1DX4Jp_u56637U" },
+    { name: "K-Pop Fresh", url: "https://open.spotify.com/playlist/37i9dQZF1DX4id962p36Uv" },
+    { name: "Power Workout", url: "https://open.spotify.com/playlist/37i9dQZF1DX76W9SwwE6fk" },
+    { name: "Vibe Check", url: "https://open.spotify.com/playlist/37i9dQZF1DX9B6JvAtU8Oa" },
+    { name: "Chill Tracks", url: "https://open.spotify.com/playlist/37i9dQZF1DX4WYpdgoIcn6" },
+    { name: "Dance Pop", url: "https://open.spotify.com/playlist/37i9dQZF1DX6Sa99U30mB" },
+    { name: "Soft Pop Hits", url: "https://open.spotify.com/playlist/37i9dQZF1DWTwnS1uXvX9X" },
+    { name: "Viral Hits", url: "https://open.spotify.com/playlist/37i9dQZF1DX2L6S9sY54vP" },
+    { name: "Bailando", url: "https://open.spotify.com/playlist/37i9dQZF1DXd8S3H0YI32G" },
+    { name: "Summer Hits", url: "https://open.spotify.com/playlist/37i9dQZF1DX369YvuyY9L9" },
+    { name: "Pop Sauce", url: "https://open.spotify.com/playlist/37i9dQZF1DXa6Yeg676f_h" },
+    { name: "Global Top 50", url: "https://open.spotify.com/playlist/37i9dQZEVXbMDoHDwVN2t6" }
+  ],
+  appleMusic: [
+    { name: "Today's Hits", url: "https://music.apple.com/playlist/todays-hits" },
+    { name: "BTS Essentials", url: "https://music.apple.com/playlist/bts-essentials" },
+    { name: "A-List K-Pop", url: "https://music.apple.com/playlist/a-list-k-pop" },
+    { name: "New Music Daily", url: "https://music.apple.com/playlist/new-music-daily" },
+    { name: "Top 100: Global", url: "https://music.apple.com/playlist/top-100-global" },
+    { name: "Viral Hits", url: "https://music.apple.com/playlist/viral-hits" },
+    { name: "K-Pop Today", url: "https://music.apple.com/playlist/k-pop-today" },
+    { name: "Pure Pop", url: "https://music.apple.com/playlist/pure-pop" },
+    { name: "Pop Chill", url: "https://music.apple.com/playlist/pop-chill" },
+    { name: "Future Hits", url: "https://music.apple.com/playlist/future-hits" },
+    { name: "Summer Vibes", url: "https://music.apple.com/playlist/summer-vibes" },
+    { name: "The A-List", url: "https://music.apple.com/playlist/the-a-list" },
+    { name: "Breaking Pop", url: "https://music.apple.com/playlist/breaking-pop" },
+    { name: "Supernova", url: "https://music.apple.com/playlist/supernova" },
+    { name: "Shazam Hits", url: "https://music.apple.com/playlist/shazam-hits" },
+    { name: "Alpha", url: "https://music.apple.com/playlist/alpha" },
+    { name: "Feeling Happy", url: "https://music.apple.com/playlist/feeling-happy" },
+    { name: "Pop Deluxe", url: "https://music.apple.com/playlist/pop-deluxe" },
+    { name: "Dance XL", url: "https://music.apple.com/playlist/dance-xl" },
+    { name: "Global Chart", url: "https://music.apple.com/playlist/global-chart" }
+  ]
+};
+
 export const INITIAL_REGIONS = [
   {
     country: "India",
     region: "South Asia",
-    hashtag: "#BTS_India #SouthAsia_Stream #PurpleProject",
+    goal: "Reach #1 on Top 50 India and 5M streams in 24H.",
     tz: "Asia/Kolkata",
     spotifyReset: "12:30 AM",
     appleReset: "1:30 AM",
-    playlists: {
-      spotify: [
-        { name: "Top 50 India", url: "https://open.spotify.com/playlist/37i9dQZECXcR7U" },
-        { name: "BTS Essentials", url: "https://open.spotify.com/playlist/37i9dQZF1DWY6t8ST7S7lD" },
-        { name: "Global Viral 50", url: "https://open.spotify.com/playlist/37i9dQZEVXbLiRS9vS9v9" },
-        { name: "This is BTS", url: "https://open.spotify.com/playlist/37i9dQZF1DX086nd7TYp8B" },
-        { name: "K-Pop ON!", url: "https://open.spotify.com/playlist/37i9dQZF1DX9t9mBzbzhCt" },
-        { name: "Hot Hits India", url: "https://open.spotify.com/playlist/37i9dQZF1DX0XUsKBCl9jG" }
-      ],
-      appleMusic: [
-        { name: "Today's Hits", url: "https://music.apple.com/playlist/todays-hits" },
-        { name: "BTS Essentials", url: "https://music.apple.com/playlist/bts-essentials" },
-        { name: "A-List K-Pop", url: "https://music.apple.com/playlist/a-list-k-pop" },
-        { name: "New Music Daily", url: "https://music.apple.com/playlist/new-music-daily" },
-        { name: "Top 100: India", url: "https://music.apple.com/playlist/top-100-india" },
-        { name: "Viral Hits", url: "https://music.apple.com/playlist/viral-hits" }
-      ]
-    },
+    playlists: FOCUS_PLAYLISTS,
     gFormUrl: "https://forms.gle/india_stream_proof"
   },
   {
     country: "USA",
     region: "North America",
-    hashtag: "#BTS_USA #NA_Streaming #Dynamite",
+    goal: "Top 10 on Billboard Hot 100 and 10M streams.",
     tz: "America/New_York",
     spotifyReset: "12:00 AM",
     appleReset: "1:00 AM",
-    playlists: {
-      spotify: [
-        { name: "Today's Top Hits", url: "https://open.spotify.com/playlist/37i9dQZF1DXcBWf9p4H7hp" },
-        { name: "BTS Essentials", url: "https://open.spotify.com/playlist/37i9dQZF1DWY6t8ST7S7lD" },
-        { name: "Viral 50 USA", url: "https://open.spotify.com/playlist/37i9dQZEVXbKua9Cws9BIn" },
-        { name: "Pop Rising", url: "https://open.spotify.com/playlist/37i9dQZF1DX6Sa99U30mB" },
-        { name: "New Music Friday", url: "https://open.spotify.com/playlist/37i9dQZF1DX4Jp_u56637U" },
-        { name: "Hot Country", url: "https://open.spotify.com/playlist/37i9dQZF1DX1lVhptv6uYI" }
-      ],
-      appleMusic: [
-        { name: "Today's Hits", url: "https://music.apple.com/playlist/todays-hits" },
-        { name: "BTS Essentials", url: "https://music.apple.com/playlist/bts-essentials" },
-        { name: "A-List Pop", url: "https://music.apple.com/playlist/a-list-pop" },
-        { name: "New Music Daily", url: "https://music.apple.com/playlist/new-music-daily" },
-        { name: "Top 100: Global", url: "https://music.apple.com/playlist/top-100-global" },
-        { name: "K-Pop Today", url: "https://music.apple.com/playlist/k-pop-today" }
-      ]
-    },
+    playlists: FOCUS_PLAYLISTS,
     gFormUrl: "https://forms.gle/usa_stream_proof"
   },
   {
     country: "Australia",
     region: "Oceania",
-    hashtag: "#BTS_Australia #Oceania_Streaming #Butter",
+    goal: "Debut in Top 50 ARIA Charts.",
     tz: "Australia/Sydney",
     spotifyReset: "12:00 AM",
     appleReset: "1:00 AM",
-    playlists: {
-      spotify: [
-        { name: "Top 50 Australia", url: "https://open.spotify.com/playlist/37i9dQZEVXbJP76WNN6HOH" },
-        { name: "BTS Essentials", url: "https://open.spotify.com/playlist/37i9dQZF1DWY6t8ST7S7lD" },
-        { name: "Viral 50 AU", url: "https://open.spotify.com/playlist/37i9dQZEVXbK4is2wUasBu" },
-        { name: "Hot Hits AU", url: "https://open.spotify.com/playlist/37i9dQZF1DX6Xv87Id6XqC" },
-        { name: "This is BTS", url: "https://open.spotify.com/playlist/37i9dQZF1DX086nd7TYp8B" },
-        { name: "New Music AU", url: "https://open.spotify.com/playlist/37i9dQZF1DX7L7eO86uB8O" }
-      ],
-      appleMusic: [
-        { name: "Today's Hits", url: "https://music.apple.com/playlist/todays-hits" },
-        { name: "BTS Essentials", url: "https://music.apple.com/playlist/bts-essentials" },
-        { name: "A-List K-Pop", url: "https://music.apple.com/playlist/a-list-k-pop" },
-        { name: "Top 100: Australia", url: "https://music.apple.com/playlist/top-100-australia" },
-        { name: "Viral Hits", url: "https://music.apple.com/playlist/viral-hits" },
-        { name: "K-Pop Today", url: "https://music.apple.com/playlist/k-pop-today" }
-      ]
-    },
+    playlists: FOCUS_PLAYLISTS,
     gFormUrl: "https://forms.gle/oceania_stream_proof"
   }
 ];
@@ -643,28 +639,11 @@ export const INITIAL_REGIONS = [
 export const GLOBAL_DEFAULT = {
   country: "Global",
   region: "Global",
-  hashtag: "#BTS_Global #StreamingParty #BTSSingle",
+  goal: "Global domination and #1 on Spotify Global Top 50.",
   tz: "UTC",
   spotifyReset: "12:00 AM",
   appleReset: "1:00 AM",
-  playlists: {
-    spotify: [
-      { name: "Global Top 50", url: "https://open.spotify.com/playlist/37i9dQZEVXbMDoHDwVN2t6" },
-      { name: "BTS Essentials", url: "https://open.spotify.com/playlist/37i9dQZF1DWY6t8ST7S7lD" },
-      { name: "Today's Top Hits", url: "https://open.spotify.com/playlist/37i9dQZF1DXcBWf9p4H7hp" },
-      { name: "K-Pop ON!", url: "https://open.spotify.com/playlist/37i9dQZF1DX9t9mBzbzhCt" },
-      { name: "This is BTS", url: "https://open.spotify.com/playlist/37i9dQZF1DX086nd7TYp8B" },
-      { name: "Viral 50 Global", url: "https://open.spotify.com/playlist/37i9dQZEVXbLiRS9vS9v9" }
-    ],
-    appleMusic: [
-      { name: "Today's Hits", url: "https://music.apple.com/playlist/todays-hits" },
-      { name: "BTS Essentials", url: "https://music.apple.com/playlist/bts-essentials" },
-      { name: "A-List K-Pop", url: "https://music.apple.com/playlist/a-list-k-pop" },
-      { name: "New Music Daily", url: "https://music.apple.com/playlist/new-music-daily" },
-      { name: "Top 100: Global", url: "https://music.apple.com/playlist/top-100-global" },
-      { name: "Viral Hits", url: "https://music.apple.com/playlist/viral-hits" }
-    ]
-  },
+  playlists: FOCUS_PLAYLISTS,
   gFormUrl: "https://forms.gle/global_stream_proof"
 };
 

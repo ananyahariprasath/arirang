@@ -28,9 +28,9 @@ const FlipCard = ({ value, label, theme }) => {
   const previous = String(previousValue).padStart(2, "0");
 
   const cardStyle = `
-    relative w-16 h-20 md:w-20 md:h-24 rounded-lg
+    relative w-14 h-18 md:w-16 md:h-20 rounded-lg
     flex flex-col
-    text-3xl md:text-5xl font-bold
+    text-2xl md:text-4xl font-bold
     bg-transparent
     perspective-1000
     transform-style-3d
@@ -99,7 +99,7 @@ const FlipCard = ({ value, label, theme }) => {
           </div>
       </div>
 
-      <span className="mt-2 text-xs md:text-sm font-medium uppercase tracking-wider opacity-70">
+      <span className="mt-1 text-[9px] md:text-[10px] font-medium uppercase tracking-wider opacity-70">
         {label}
       </span>
     </div>
@@ -149,7 +149,7 @@ const CountdownTimer = () => {
       
 
 
-      <div className="flex gap-4 md:gap-6">
+      <div className="flex gap-2 md:gap-3">
         <FlipCard value={days} label="Days" theme={theme} />
         <FlipCard value={hours} label="Hours" theme={theme} />
         <FlipCard value={minutes} label="Min" theme={theme} />

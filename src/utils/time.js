@@ -53,8 +53,8 @@ export const formatResetTime = (timeStr, timezone) => {
   try {
     let hours, minutes;
     
-    // Check if it's 12h format (e.g., "12:30 AM")
-    const match12 = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    // Check if it's 12h format (e.g., "12:30 AM") - more flexible regex to handle suffixes like IST
+    const match12 = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)(?:\s+\w+)?$/i);
     if (match12) {
       hours = parseInt(match12[1]);
       minutes = parseInt(match12[2]);

@@ -6,73 +6,55 @@ const INITIAL_MODS = [
     id: "mod-a",
     name: "Mod A",
     status: "online",
-    links: {
-      x: "https://x.com/moda",
-      instagram: "https://instagram.com/moda",
-      weverse: "https://weverse.io/moda",
-      facebook: "https://facebook.com/moda",
-      telegram: "https://t.me/moda",
-    },
+    accounts: [
+      { platform: "X", url: "https://x.com/moda" },
+      { platform: "Instagram", url: "https://instagram.com/moda" }
+    ],
   },
   {
     id: "mod-b",
     name: "Mod B",
     status: "online",
-    links: {
-      x: "https://x.com/modb",
-      instagram: "https://instagram.com/modb",
-      weverse: "https://weverse.io/modb",
-      facebook: "https://facebook.com/modb",
-      telegram: "https://t.me/modb",
-    },
+    accounts: [
+      { platform: "X", url: "https://x.com/modb" },
+      { platform: "Instagram", url: "https://instagram.com/modb" }
+    ],
   },
   {
     id: "mod-c",
     name: "Mod C",
     status: "online",
-    links: {
-      x: "https://x.com/modc",
-      instagram: "https://instagram.com/modc",
-      weverse: "https://weverse.io/modc",
-      facebook: "https://facebook.com/modc",
-      telegram: "https://t.me/modc",
-    },
+    accounts: [
+      { platform: "X", url: "https://x.com/modc" },
+      { platform: "Instagram", url: "https://instagram.com/modc" }
+    ],
   },
   {
     id: "mod-d",
     name: "Mod D",
     status: "online",
-    links: {
-      x: "https://x.com/modd",
-      instagram: "https://instagram.com/modd",
-      weverse: "https://weverse.io/modd",
-      facebook: "https://facebook.com/modd",
-      telegram: "https://t.me/modd",
-    },
+    accounts: [
+      { platform: "X", url: "https://x.com/modd" },
+      { platform: "Instagram", url: "https://instagram.com/modd" }
+    ],
   },
   {
     id: "mod-e",
     name: "Mod E",
     status: "online",
-    links: {
-      x: "https://x.com/mode",
-      instagram: "https://instagram.com/mode",
-      weverse: "https://weverse.io/mode",
-      facebook: "https://facebook.com/mode",
-      telegram: "https://t.me/mode",
-    },
+    accounts: [
+      { platform: "X", url: "https://x.com/mode" },
+      { platform: "Instagram", url: "https://instagram.com/mode" }
+    ],
   },
   {
     id: "mod-f",
     name: "Mod F",
     status: "online",
-    links: {
-      x: "https://x.com/modf",
-      instagram: "https://instagram.com/modf",
-      weverse: "https://weverse.io/modf",
-      facebook: "https://facebook.com/modf",
-      telegram: "https://t.me/modf",
-    },
+    accounts: [
+      { platform: "X", url: "https://x.com/modf" },
+      { platform: "Instagram", url: "https://instagram.com/modf" }
+    ],
   },
 ];
 
@@ -98,7 +80,19 @@ export default function useModStatus() {
 
       const saved = localStorage.getItem("modStatusData");
       if (saved) {
-        setMods(JSON.parse(saved));
+        let parsed = JSON.parse(saved);
+        // Migration: If we have old 'links' object but no 'accounts', convert it
+        const migrated = parsed.map(m => {
+          if (!m.accounts && m.links) {
+            const accounts = [
+              { platform: "X", url: m.links.x || "" },
+              { platform: "Instagram", url: m.links.instagram || "" }
+            ];
+            return { ...m, accounts };
+          }
+          return m;
+        });
+        setMods(migrated);
       } else {
         setMods(INITIAL_MODS);
         localStorage.setItem("modStatusData", JSON.stringify(INITIAL_MODS));
@@ -120,10 +114,10 @@ export default function useModStatus() {
     });
   };
 
-  const updateModDetails = (id, newName, newLinks) => {
+  const updateModDetails = (id, newName, newAccounts) => {
     setMods(prev => {
       const updated = prev.map((m) => 
-        m.id === id ? { ...m, name: newName, links: newLinks } : m
+        m.id === id ? { ...m, name: newName, accounts: newAccounts } : m
       );
       localStorage.setItem("modStatusData", JSON.stringify(updated));
       return updated;

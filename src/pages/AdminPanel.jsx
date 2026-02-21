@@ -4,26 +4,31 @@ import useBattles from "../hooks/useBattles";
 import useTimeline from "../hooks/useTimeline";
 import useRegionalData from "../hooks/useRegionalData";
 import useModStatus from "../hooks/useModStatus";
+import useGalleryData from "../hooks/useGalleryData";
 import { useToast } from "../context/ToastContext";
-import { COUNTRY_PRESETS, COUNTRY_REGION_MAP, COUNTRIES, COUNTRY_TZ_MAP } from "../constants";
+import { COUNTRY_PRESETS, COUNTRY_REGION_MAP, COUNTRIES, COUNTRY_TZ_MAP, FOCUS_PLAYLISTS } from "../constants";
 
 function AdminPanel() {
   const [activeTab, setActiveTab] = useState("tickets");
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [tickets, setTickets] = useState([]);
-  const { battles, liveBattles, addBattle, updateLiveBattles, deleteBattle, clearBattles, loading: battlesLoading } = useBattles();
-  const { events, addEvent, deleteEvent, clearTimeline, resetToDefault, loading: timelineLoading } = useTimeline();
+  const { battles, liveBattles, addBattle, updateBattle, updateLiveBattles, deleteBattle, clearBattles, resetLiveBattles, loading: battlesLoading } = useBattles();
+  const { events, addEvent, updateEvent, deleteEvent, clearTimeline, resetToDefault, loading: timelineLoading } = useTimeline();
   const { regions, addRegion, deleteRegion, resetRegions, loading: regionsLoading } = useRegionalData();
   const { mods, toggleStatus, updateModDetails, resetMods, loading: modsLoading } = useModStatus();
+  const { galleryImages, loading: galleryLoading, resetGallery, addGalleryImage, deleteGalleryImage, updateGalleryImage } = useGalleryData();
   const toast = useToast();
 
-  const isDataLoading = regionsLoading || modsLoading || battlesLoading || timelineLoading;
+  const isDataLoading = regionsLoading || modsLoading || battlesLoading || timelineLoading || galleryLoading;
   
   // New Battle History Form State
   const [newBattle, setNewBattle] = useState({
     date: "",
     time: "",
     regions: "",
-    target: ""
+    target: "",
+    progress: 100,
+    reachedTarget: true
   });
 
   // Live Battles Editor State (one entry per live battle)
@@ -31,9 +36,9 @@ function AdminPanel() {
 
   // New Timeline Event State
   const [newEvent, setNewEvent] = useState({
-    date: "March 20",
+    date: "",
     time: "",
-    platform: "YouTube",
+    platform: "Spotify",
     event: ""
   });
 
@@ -41,20 +46,26 @@ function AdminPanel() {
   const [newRegion, setNewRegion] = useState({
     country: "",
     region: "",
-    hashtag: "",
+    goal: "",
     tz: "",
     spotifyReset: "",
     appleReset: "",
-    gFormUrl: "",
-    playlists: { spotify: [], appleMusic: [] }
+    playlists: FOCUS_PLAYLISTS,
+    gFormUrl: ""
   });
 
-  // Structured Playlist State (6 slots)
-  const [spotifyPlaylists, setSpotifyPlaylists] = useState(Array(6).fill({ name: "", url: "" }));
-  const [applePlaylists, setApplePlaylists] = useState(Array(6).fill({ name: "", url: "" }));
+  const [playlistPlatform, setPlaylistPlatform] = useState("spotify");
 
   const [countrySearch, setCountrySearch] = useState("");
   const [showCountryDrop, setShowCountryDrop] = useState(false);
+
+  const [newGalleryImage, setNewGalleryImage] = useState({ src: "", type: "square" });
+  const [editingGallerySrc, setEditingGallerySrc] = useState(null);
+  const [editingGalleryType, setEditingGalleryType] = useState("");
+  const [editingBattleId, setEditingBattleId] = useState(null);
+  const [editingBattle, setEditingBattle] = useState(null);
+  const [editingEventId, setEditingEventId] = useState(null);
+  const [editingEvent, setEditingEvent] = useState(null);
 
   useEffect(() => {
     setLiveEdits(liveBattles);
@@ -93,11 +104,13 @@ function AdminPanel() {
       date: newBattle.date,
       time: newBattle.time,
       regions: newBattle.regions.split(",").map(r => r.trim()),
-      target: newBattle.target
+      target: newBattle.target,
+      progress: newBattle.progress,
+      reachedTarget: newBattle.reachedTarget
     };
 
     addBattle(battleObj);
-    setNewBattle({ date: "", time: "", regions: "", target: "" });
+    setNewBattle({ date: "", time: "", regions: "", target: "", progress: 100, reachedTarget: true });
   };
 
   const handleAddTimelineEvent = (e) => {
@@ -113,37 +126,56 @@ function AdminPanel() {
     };
 
     addEvent(eventObj);
-    setNewEvent({ date: "March 20", time: "", platform: "YouTube", event: "" });
+    setNewEvent({ date: "", time: "", platform: "Spotify", event: "" });
   };
 
   const handleAddRegion = (e) => {
     e.preventDefault();
-    if (!newRegion.country || !newRegion.region || !newRegion.hashtag) {
-      toast.show("Please fill necessary fields (Country, Region, Hashtags)", "error");
+    if (!newRegion.country || !newRegion.region || !newRegion.goal) {
+      toast.show("Please fill necessary fields (Country, Region, Goal)", "error");
       return;
     }
 
-    // Filter out empty playlist slots
-    const sList = spotifyPlaylists.filter(p => p.name.trim() && p.url.trim());
-    const aList = applePlaylists.filter(p => p.name.trim() && p.url.trim());
-
-    const regionObj = {
-      ...newRegion,
-      playlists: {
-        spotify: sList,
-        appleMusic: aList
-      }
-    };
-
-    addRegion(regionObj);
-    toast.show("Regional Info Saved! 💜", "success");
+    addRegion(newRegion);
     
     // Reset Form
-    setNewRegion({ country: "", region: "", hashtag: "", tz: "", spotifyReset: "", appleReset: "", gFormUrl: "", playlists: { spotify: [], appleMusic: [] } });
-    setSpotifyPlaylists(Array(6).fill({ name: "", url: "" }));
-    setApplePlaylists(Array(6).fill({ name: "", url: "" }));
+    setNewRegion({ 
+      country: "", 
+      region: "", 
+      goal: "", 
+      tz: "", 
+      spotifyReset: "", 
+      appleReset: "", 
+      playlists: FOCUS_PLAYLISTS, 
+      gFormUrl: "" 
+    });
     setCountrySearch("");
     setShowCountryDrop(false);
+    toast.show(`${newRegion.country} Regional Info Saved! 💜`, "success");
+  };
+
+  const handleAddGalleryImage = (e) => {
+    e.preventDefault();
+    if (!newGalleryImage.src || !newGalleryImage.type) {
+      toast.show("Please enter an image URL and select orientation", "error");
+      return;
+    }
+    
+    // Check if URL already exists
+    if (galleryImages.some(img => img.src === newGalleryImage.src)) {
+      toast.show("This image is already in the gallery pool!", "error");
+      return;
+    }
+
+    addGalleryImage(newGalleryImage);
+    setNewGalleryImage({ src: "", type: "square" });
+    toast.show("Image added to gallery pool! 💜", "success");
+  };
+
+  const updatePlaylistField = (platform, index, field, value) => {
+    const updatedPlaylists = { ...newRegion.playlists };
+    updatedPlaylists[platform][index] = { ...updatedPlaylists[platform][index], [field]: value };
+    setNewRegion({ ...newRegion, playlists: updatedPlaylists });
   };
 
   const handlePresetChange = (val) => {
@@ -179,17 +211,7 @@ function AdminPanel() {
     setShowCountryDrop(false);
   };
 
-  const updatePlaylist = (index, field, value) => {
-    const updated = [...spotifyPlaylists];
-    updated[index] = { ...updated[index], [field]: value };
-    setSpotifyPlaylists(updated);
-  };
 
-  const updateApplePlaylist = (index, field, value) => {
-    const updated = [...applePlaylists];
-    updated[index] = { ...updated[index], [field]: value };
-    setApplePlaylists(updated);
-  };
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
@@ -199,43 +221,37 @@ function AdminPanel() {
         <div className="sticky top-[68px] z-40 bg-[var(--bg-primary)]/80 backdrop-blur-md pb-6 mb-12 border-b border-[var(--accent)]/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <h1 className="text-4xl font-black text-[var(--accent)] tracking-tight">Admin Dashboard</h1>
           
-          <div className="flex bg-[var(--accent)]/10 p-1 rounded-2xl border border-[var(--accent)]/20 overflow-x-auto no-scrollbar">
+          <div className="relative">
             <button 
-              onClick={() => setActiveTab("tickets")}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === "tickets" ? "bg-[var(--accent)] text-white shadow-lg" : "opacity-60 hover:opacity-100"}`}
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="p-3 bg-[var(--accent)] text-black rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-[var(--accent)]/30 hover:scale-[1.05] active:scale-95 transition-all"
             >
-              Support Tickets
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+              <span className="text-xs uppercase tracking-widest hidden md:inline">
+                {activeTab.replace("timeline", "Timeline").replace("regions", "Regions").replace("mods", "Mods").replace("global", "Global Config").replace("battles", "Battles").replace("tickets", "Support Tickets")}
+              </span>
             </button>
-            <button 
-              onClick={() => setActiveTab("battles")}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === "battles" ? "bg-[var(--accent)] text-white shadow-lg" : "opacity-60 hover:opacity-100"}`}
-            >
-              Battle Manager
-            </button>
-            <button 
-              onClick={() => setActiveTab("timeline")}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === "timeline" ? "bg-[var(--accent)] text-white shadow-lg" : "opacity-60 hover:opacity-100"}`}
-            >
-              Timeline Manager
-            </button>
-            <button 
-              onClick={() => setActiveTab("regions")}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === "regions" ? "bg-[var(--accent)] text-white shadow-lg" : "opacity-60 hover:opacity-100"}`}
-            >
-              Region Manager
-            </button>
-            <button 
-              onClick={() => setActiveTab("mods")}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === "mods" ? "bg-[var(--accent)] text-white shadow-lg" : "opacity-60 hover:opacity-100"}`}
-            >
-              Mod Manager
-            </button>
-            <button 
-              onClick={() => setActiveTab("global")}
-              className={`px-6 py-2 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${activeTab === "global" ? "bg-[var(--accent)] text-white shadow-lg" : "opacity-60 hover:opacity-100"}`}
-            >
-              Global Config
-            </button>
+
+            {isMenuOpen && (
+              <>
+                {/* Backdrop to close menu when clicking outside */}
+                <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
+                
+                <div className="absolute top-full right-0 md:left-0 md:right-auto mt-3 w-56 bg-[var(--bg-primary)]/90 backdrop-blur-3xl border border-[var(--accent)]/40 p-2 rounded-2xl shadow-2xl z-50 flex flex-col gap-1 animate-in slide-in-from-top-2 fade-in duration-200">
+                  <MenuButton tab="tickets" label="Support Tickets" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
+                  <MenuButton tab="battles" label="Battle Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
+                  <MenuButton tab="timeline" label="Timeline Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
+                  <MenuButton tab="regions" label="Region Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
+                  <MenuButton tab="mods" label="Mod Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
+                  <MenuButton tab="gallery" label="Gallery Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
+                  <MenuButton tab="global" label="Global Config" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -260,20 +276,20 @@ function AdminPanel() {
             ) : (
               <div className="bg-[var(--card-bg)]/40 backdrop-blur-xl border border-[var(--accent)]/40 rounded-3xl overflow-hidden shadow-2xl">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead className="bg-[var(--accent)]/10 border-b border-[var(--accent)]/20">
+                  <table className="w-full text-left min-w-[700px]">
+                    <thead className="bg-[var(--accent)]/5 border-b border-[var(--accent)]/20">
                       <tr>
-                        <th className="p-5 font-bold text-xs uppercase tracking-widest opacity-60">Date</th>
-                        <th className="p-5 font-bold text-xs uppercase tracking-widest opacity-60">User ID</th>
-                        <th className="p-5 font-bold text-xs uppercase tracking-widest opacity-60">Platform</th>
-                        <th className="p-5 font-bold text-xs uppercase tracking-widest opacity-60">Query</th>
-                        <th className="p-5 font-bold text-xs uppercase tracking-widest opacity-60 text-right">Actions</th>
+                        <th className="p-6 font-black text-[10px] uppercase tracking-[0.2em] text-[var(--text-secondary)]">Date</th>
+                        <th className="p-6 font-black text-[10px] uppercase tracking-[0.2em] text-[var(--text-secondary)]">User ID</th>
+                        <th className="p-6 font-black text-[10px] uppercase tracking-[0.2em] text-[var(--text-secondary)]">Platform</th>
+                        <th className="p-6 font-black text-[10px] uppercase tracking-[0.2em] text-[var(--text-secondary)]">Query</th>
+                        <th className="p-6 font-black text-[10px] uppercase tracking-[0.2em] text-[var(--text-secondary)] text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--accent)]/10">
                       {tickets.map((ticket) => (
                         <tr key={ticket.id} className="hover:bg-[var(--accent)]/5 transition-colors group">
-                          <td className="p-5 text-sm opacity-60">{ticket.timestamp}</td>
+                          <td className="p-5 text-sm text-[var(--text-secondary)]">{ticket.timestamp}</td>
                           <td className="p-5 font-bold">{ticket.userId}</td>
                           <td className="p-5">
                             <span className="bg-[var(--accent)]/10 text-[var(--accent)] px-3 py-1 rounded-full text-[10px] font-black uppercase">
@@ -309,38 +325,106 @@ function AdminPanel() {
                   <h2 className="text-2xl font-bold">Battle Records ({battles.length})</h2>
                   <button 
                     onClick={() => { if(confirm("Clear history?")) clearBattles() }}
-                    className="text-xs font-bold text-red-500 opacity-60 hover:opacity-100"
+                    className="text-xs font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest"
                   >
                     Reset to Default
                   </button>
                 </div>
 
                 <div className="grid gap-4">
-                  {battles.map((battle) => (
-                    <div key={battle.id} className="bg-[var(--card-bg)]/40 p-6 rounded-3xl border border-[var(--accent)]/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 group">
-                      <div>
-                        <div className="flex items-center gap-3 mb-1">
-                          <span className="text-lg font-black text-[var(--accent)]">{battle.date}</span>
-                          <span className="text-xs opacity-50 font-bold uppercase tracking-widest">{battle.time} KST</span>
+                  {battles.length === 0 ? (
+                    <div className="text-center py-24 opacity-40 border-2 border-dashed border-[var(--accent)]/10 rounded-3xl">
+                      <p className="text-xl italic">No battle records found.</p>
+                    </div>
+                  ) : battles.map((battle) => (
+                    <div key={battle.id} className="bg-[var(--card-bg)]/40 rounded-3xl border border-[var(--accent)]/20 overflow-hidden group">
+                      {editingBattleId === battle.id ? (
+                        /* --- EDIT MODE --- */
+                        <div className="p-5 space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Date</label>
+                              <input type="date" value={editingBattle.date} onChange={e => setEditingBattle({...editingBattle, date: e.target.value})} className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]" />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Time (KST)</label>
+                              <input type="text" value={editingBattle.time} onChange={e => setEditingBattle({...editingBattle, time: e.target.value})} className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]" />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Regions (comma-separated)</label>
+                              <input type="text" value={editingBattle.regions.join(", ")} onChange={e => setEditingBattle({...editingBattle, regions: e.target.value.split(",").map(r => r.trim())})} className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]" />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Target</label>
+                              <input type="text" value={editingBattle.target} onChange={e => setEditingBattle({...editingBattle, target: e.target.value})} className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]" />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Progress %</label>
+                              <input type="number" min="0" max="100" value={editingBattle.progress} onChange={e => setEditingBattle({...editingBattle, progress: parseInt(e.target.value) || 0})} className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]" />
+                            </div>
+                            <div className="flex flex-col">
+                              <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Reached Target?</label>
+                              <div className="flex-1 flex items-center pt-1">
+                                <button 
+                                  onClick={() => setEditingBattle({...editingBattle, reachedTarget: !editingBattle.reachedTarget})}
+                                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2 border ${
+                                    editingBattle.reachedTarget 
+                                      ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30" 
+                                      : "bg-red-500/20 text-red-500 border-red-500/30"
+                                  }`}
+                                >
+                                  <span className={`w-1.5 h-1.5 rounded-full ${editingBattle.reachedTarget ? 'bg-emerald-400' : 'bg-red-500'}`}></span>
+                                  {editingBattle.reachedTarget ? "Reached" : "Missed"}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 pt-1">
+                            <button onClick={() => { updateBattle(battle.id, editingBattle); setEditingBattleId(null); toast.show("Battle record updated! 💜", "success"); }} className="flex-1 bg-[var(--accent)] text-black font-black py-2 rounded-xl text-xs hover:scale-[1.02] active:scale-95 transition-all">Save Changes</button>
+                            <button onClick={() => setEditingBattleId(null)} className="px-4 py-2 rounded-xl text-xs font-bold border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all">Cancel</button>
+                          </div>
                         </div>
-                        <div className="flex flex-wrap gap-1">
-                          {battle.regions.map(r => (
-                            <span key={r} className="text-[9px] px-2 py-0.5 bg-[var(--accent)]/10 text-[var(--accent)] rounded font-black uppercase">{r}</span>
-                          ))}
+                      ) : (
+                        /* --- VIEW MODE --- */
+                        <div className="p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                          <div>
+                            <div className="flex items-center gap-3 mb-1">
+                              <span className="text-lg font-black text-[var(--accent)]">{battle.date}</span>
+                              <span className="text-xs text-[var(--text-secondary)] font-bold uppercase tracking-widest">{battle.time} KST</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {battle.regions.map(r => (
+                                <span key={r} className="text-[9px] px-2 py-0.5 bg-[var(--accent)]/10 text-[var(--accent)] rounded font-black uppercase">{r}</span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <div className="text-[10px] text-[var(--accent)] uppercase font-black tracking-tighter leading-none">{battle.progress}%</div>
+                                <div className={`text-[8px] font-black uppercase tracking-widest mt-0.5 ${battle.reachedTarget ? 'text-emerald-400' : 'text-red-500'}`}>
+                                  {battle.reachedTarget ? 'Reached' : 'Missed'}
+                                </div>
+                              </div>
+                              <div className="w-px h-8 bg-[var(--accent)]/10"></div>
+                              <div className="text-right">
+                                <div className="text-xs text-[var(--text-secondary)] uppercase font-black tracking-tighter">Target</div>
+                                <div className="text-xl font-black">{battle.target}</div>
+                              </div>
+                            </div>
+                            <button onClick={() => { setEditingBattleId(battle.id); setEditingBattle({...battle}); }} className="p-3 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] sm:opacity-0 group-hover:opacity-100 transition-all hover:bg-[var(--accent)]/20" title="Edit">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            <button onClick={() => deleteBattle(battle.id)} className="p-3 rounded-xl bg-red-500/10 text-red-500 sm:opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white" title="Delete">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-6">
-                        <div className="text-right">
-                          <div className="text-xs opacity-40 uppercase font-black tracking-tighter">Target</div>
-                          <div className="text-xl font-black">{battle.target}</div>
-                        </div>
-                        <button 
-                          onClick={() => deleteBattle(battle.id)}
-                          className="p-3 rounded-xl bg-red-500/10 text-red-500 sm:opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                        </button>
-                      </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -350,6 +434,15 @@ function AdminPanel() {
               <div className="flex flex-col gap-8 h-fit lg:sticky lg:top-12">
                 
                 {/* 1. Live Battles Editor — one card per battle */}
+                <div className="flex justify-between items-center mb-1">
+                  <h2 className="text-xl font-black uppercase tracking-tighter text-[var(--accent)]">Live Battles Editor</h2>
+                  <button 
+                    onClick={() => { if(confirm("Reset all 4 live battles to default (0% progress)?")) resetLiveBattles() }}
+                    className="text-[10px] font-black text-red-500 hover:text-red-600 transition-colors uppercase tracking-[0.2em]"
+                  >
+                    Reset to Default
+                  </button>
+                </div>
                 {liveEdits.map((lb, i) => (
                   <div key={lb.id} className="bg-[var(--card-bg)]/80 backdrop-blur-2xl p-6 rounded-3xl border border-[var(--accent)]/40 shadow-xl">
                     <h3 className="text-sm font-black mb-3 uppercase tracking-tight text-[var(--accent)] flex items-center gap-2">
@@ -358,7 +451,7 @@ function AdminPanel() {
                     </h3>
                     <div className="space-y-2">
                       <div>
-                        <label className="text-[9px] font-black uppercase opacity-40 ml-1">Title</label>
+                        <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Title</label>
                         <input
                           type="text"
                           value={lb.title}
@@ -367,12 +460,12 @@ function AdminPanel() {
                             updated[i] = { ...updated[i], title: e.target.value };
                             setLiveEdits(updated);
                           }}
-                          className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                          className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]"
                         />
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         <div>
-                          <label className="text-[9px] font-black uppercase opacity-40 ml-1">Goal</label>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Goal</label>
                           <input
                             type="text"
                             value={lb.goal}
@@ -381,11 +474,11 @@ function AdminPanel() {
                               updated[i] = { ...updated[i], goal: e.target.value };
                               setLiveEdits(updated);
                             }}
-                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]"
                           />
                         </div>
                         <div>
-                          <label className="text-[9px] font-black uppercase opacity-40 ml-1">Progress %</label>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Progress %</label>
                           <input
                             type="number" min="0" max="100"
                             value={lb.progress}
@@ -394,11 +487,11 @@ function AdminPanel() {
                               updated[i] = { ...updated[i], progress: parseInt(e.target.value) || 0 };
                               setLiveEdits(updated);
                             }}
-                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]"
                           />
                         </div>
                         <div>
-                          <label className="text-[9px] font-black uppercase opacity-40 ml-1">Status</label>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Status</label>
                           <select
                             value={lb.status}
                             onChange={(e) => {
@@ -406,9 +499,9 @@ function AdminPanel() {
                               updated[i] = { ...updated[i], status: e.target.value };
                               setLiveEdits(updated);
                             }}
-                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all appearance-none"
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all appearance-none text-[var(--text-primary)]"
                           >
-                            {["Surging", "On Track", "Heating Up", "Almost There"].map(s => (
+                            {["Yet to Start", "Surging", "On Track", "Heating Up", "Almost There"].map(s => (
                               <option key={s} value={s}>{s}</option>
                             ))}
                           </select>
@@ -429,51 +522,81 @@ function AdminPanel() {
                   <h3 className="text-lg font-black mb-4 uppercase tracking-tight text-[var(--accent)]">Record History</h3>
                   <form onSubmit={handleAddBattle} className="space-y-3">
                     <div>
-                      <label className="text-[9px] font-black uppercase opacity-40 ml-1">Date</label>
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Date</label>
                       <input 
                         type="date" 
                         value={newBattle.date}
                         onChange={(e) => setNewBattle({...newBattle, date: e.target.value})}
-                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-[9px] font-black uppercase opacity-40 ml-1">Time (KST)</label>
+                        <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Time (KST)</label>
                         <input 
                           type="text" 
                           placeholder="22:00"
                           value={newBattle.time}
                           onChange={(e) => setNewBattle({...newBattle, time: e.target.value})}
-                          className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                          className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                         />
                       </div>
                       <div>
-                        <label className="text-[9px] font-black uppercase opacity-40 ml-1">Target</label>
+                        <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Target</label>
                         <input 
                           type="text" 
                           placeholder="10M"
                           value={newBattle.target}
                           onChange={(e) => setNewBattle({...newBattle, target: e.target.value})}
-                          className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                          className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                         />
                       </div>
                     </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Final Progress %</label>
+                        <input 
+                          type="number" min="0" max="100"
+                          value={newBattle.progress}
+                          onChange={(e) => setNewBattle({...newBattle, progress: parseInt(e.target.value) || 0})}
+                          className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]"
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Target Status</label>
+                        <div className="flex-1 flex gap-2 pt-1">
+                          <button 
+                            type="button"
+                            onClick={() => setNewBattle({...newBattle, reachedTarget: true})}
+                            className={`flex-1 rounded-xl text-[9px] font-black uppercase transition-all border ${newBattle.reachedTarget ? 'bg-emerald-500 text-black border-emerald-500' : 'bg-transparent text-emerald-500 border-emerald-500/20'}`}
+                          >
+                            Reached
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setNewBattle({...newBattle, reachedTarget: false})}
+                            className={`flex-1 rounded-xl text-[9px] font-black uppercase transition-all border ${!newBattle.reachedTarget ? 'bg-red-500 text-white border-red-500' : 'bg-transparent text-red-500 border-red-500/20'}`}
+                          >
+                            Missed
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                     <div>
-                      <label className="text-[9px] font-black uppercase opacity-40 ml-1">Regions</label>
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Regions</label>
                       <input 
                         type="text" 
                         placeholder="India, Korea, USA"
                         value={newBattle.regions}
                         onChange={(e) => setNewBattle({...newBattle, regions: e.target.value})}
-                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                       />
                     </div>
-                    <button 
+                     <button 
                       type="submit"
-                      className="w-full border-2 border-[var(--accent)] text-[var(--accent)] font-black py-3 rounded-xl text-xs hover:bg-[var(--accent)] hover:text-white transition-all mt-2"
+                      className="w-full bg-[var(--accent)] text-black dark:text-black font-black py-3 rounded-xl text-xs hover:scale-[1.02] active:scale-[0.98] transition-all mt-2 shadow-lg shadow-[var(--accent)]/20 uppercase tracking-widest"
                     >
-                      ADD TO HISTORY
+                      Add to History 💜
                     </button>
                   </form>
                 </div>
@@ -494,7 +617,7 @@ function AdminPanel() {
                   <h2 className="text-2xl font-bold">Streaming Timeline ({events.length})</h2>
                   <button 
                     onClick={() => { if(confirm("Reset timeline?")) resetToDefault() }}
-                    className="text-xs font-bold text-red-500 opacity-60 hover:opacity-100"
+                    className="text-xs font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest"
                   >
                     Reset to Default
                   </button>
@@ -502,26 +625,59 @@ function AdminPanel() {
 
                 <div className="space-y-4">
                   {events.map((ev) => (
-                    <div key={ev.id} className="bg-[var(--card-bg)]/40 p-5 rounded-3xl border border-[var(--accent)]/20 flex justify-between items-center group">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-[var(--accent)]/10 flex flex-col items-center justify-center">
-                          <span className="text-[10px] font-black uppercase text-[var(--accent)] leading-none">{ev.date.split(" ")[0]}</span>
-                          <span className="text-sm font-black text-[var(--accent)]">{ev.date.split(" ")[1]}</span>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-bold">{ev.time} KST</span>
-                            <span className="text-[9px] px-2 py-0.5 bg-[var(--accent)]/20 rounded font-black uppercase tracking-widest">{ev.platform}</span>
+                    <div key={ev.id} className="bg-[var(--card-bg)]/40 rounded-3xl border border-[var(--accent)]/20 overflow-hidden group">
+                      {editingEventId === ev.id ? (
+                        /* --- EDIT MODE --- */
+                        <div className="p-5 space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Date</label>
+                              <input type="text" value={editingEvent.date} onChange={e => setEditingEvent({...editingEvent, date: e.target.value})} placeholder="March 20" className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30" />
+                            </div>
+                            <div>
+                              <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Time (KST)</label>
+                              <input type="text" value={editingEvent.time} onChange={e => setEditingEvent({...editingEvent, time: e.target.value})} className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]" />
+                            </div>
                           </div>
-                          <p className="text-sm opacity-80 font-medium">{ev.event}</p>
+                          <div>
+                            <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Platform</label>
+                            <input type="text" value={editingEvent.platform} onChange={e => setEditingEvent({...editingEvent, platform: e.target.value})} className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]" />
+                          </div>
+                          <div>
+                            <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Event Description</label>
+                            <textarea value={editingEvent.event} onChange={e => setEditingEvent({...editingEvent, event: e.target.value})} className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all h-20 resize-none text-[var(--text-primary)]" />
+                          </div>
+                          <div className="flex gap-2 pt-1">
+                            <button onClick={() => { updateEvent(ev.id, editingEvent); setEditingEventId(null); toast.show("Timeline event updated! 💜", "success"); }} className="flex-1 bg-[var(--accent)] text-black font-black py-2 rounded-xl text-xs hover:scale-[1.02] active:scale-95 transition-all">Save Changes</button>
+                            <button onClick={() => setEditingEventId(null)} className="px-4 py-2 rounded-xl text-xs font-bold border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all">Cancel</button>
+                          </div>
                         </div>
-                      </div>
-                      <button 
-                        onClick={() => deleteEvent(ev.id)}
-                        className="p-2 text-red-500 sm:opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                      </button>
+                      ) : (
+                        /* --- VIEW MODE --- */
+                        <div className="p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-[var(--accent)]/10 flex flex-col items-center justify-center shrink-0">
+                              <span className="text-[10px] font-black uppercase text-[var(--accent)] leading-none">{ev.date.split(" ")[0]}</span>
+                              <span className="text-sm font-black text-[var(--accent)]">{ev.date.split(" ")[1]}</span>
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-bold">{ev.time} KST</span>
+                                <span className="text-[9px] px-2 py-0.5 bg-[var(--accent)]/20 rounded font-black uppercase tracking-widest">{ev.platform}</span>
+                              </div>
+                              <p className="text-sm opacity-80 font-medium">{ev.event}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 sm:ml-4">
+                            <button onClick={() => { setEditingEventId(ev.id); setEditingEvent({...ev}); }} className="p-2 text-[var(--accent)] sm:opacity-0 group-hover:opacity-100 transition-all hover:scale-110" title="Edit">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            </button>
+                            <button onClick={() => deleteEvent(ev.id)} className="p-2 text-red-500 sm:opacity-0 group-hover:opacity-100 transition-all hover:scale-110" title="Delete">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -533,45 +689,42 @@ function AdminPanel() {
                 <form onSubmit={handleAddTimelineEvent} className="space-y-4">
                   <div>
                     <label className="text-[9px] font-black uppercase opacity-40 ml-1">Event Date</label>
-                    <select 
+                    <input
+                      type="date"
                       value={newEvent.date}
                       onChange={(e) => setNewEvent({...newEvent, date: e.target.value})}
-                      className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all appearance-none"
-                    >
-                      {["March 20", "March 21", "March 22", "March 23", "March 24", "March 25", "March 26", "March 27"].map(d => (
-                        <option key={d} value={d}>{d}</option>
-                      ))}
-                    </select>
+                      className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                    />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[9px] font-black uppercase opacity-40 ml-1">Time (KST)</label>
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Time (KST)</label>
                       <input 
                         type="text" 
                         placeholder="13:00"
                         value={newEvent.time}
                         onChange={(e) => setNewEvent({...newEvent, time: e.target.value})}
-                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                       />
                     </div>
                     <div>
-                      <label className="text-[9px] font-black uppercase opacity-40 ml-1">Platform</label>
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Platform</label>
                       <input 
                         type="text" 
                         placeholder="YouTube"
                         value={newEvent.platform}
                         onChange={(e) => setNewEvent({...newEvent, platform: e.target.value})}
-                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="text-[9px] font-black uppercase opacity-40 ml-1">Event Description</label>
+                    <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Event Description</label>
                     <textarea 
                       placeholder="Official MV Release..."
                       value={newEvent.event}
                       onChange={(e) => setNewEvent({...newEvent, event: e.target.value})}
-                      className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all h-24 resize-none"
+                      className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all h-24 resize-none text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                     />
                   </div>
                   <button 
@@ -597,7 +750,7 @@ function AdminPanel() {
                   <h2 className="text-2xl font-bold">Regional Streaming Info ({regions.length})</h2>
                   <button 
                     onClick={() => { if(confirm("Reset regional data?")) resetRegions() }}
-                    className="text-xs font-bold text-red-500 opacity-60 hover:opacity-100"
+                    className="text-xs font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest"
                   >
                     Reset to Default
                   </button>
@@ -609,10 +762,10 @@ function AdminPanel() {
                       <div className="flex justify-between items-start mb-4">
                         <div>
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-2xl font-black">{r.country}</span>
-                            <span className="text-[10px] px-2 py-0.5 bg-[var(--accent)]/20 text-[var(--accent)] rounded font-black uppercase">{r.region}</span>
+                            <span className="text-3xl font-black tracking-tighter text-[var(--accent)]">{r.country}</span>
+                            <span className="text-[9px] px-3 py-1 bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 rounded-lg font-black uppercase tracking-widest">{r.region}</span>
                           </div>
-                          <p className="text-xs font-mono text-[var(--accent)] opacity-60">{r.hashtag}</p>
+                          <p className="text-xs font-bold text-[var(--text-primary)] opacity-50 uppercase tracking-wide">{r.goal}</p>
                         </div>
                         <button 
                           onClick={() => deleteRegion(r.country)}
@@ -622,38 +775,33 @@ function AdminPanel() {
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
-                        <div className="bg-black/10 p-3 rounded-xl">
-                          <span className="text-[9px] uppercase font-black opacity-40 block mb-1">Timezone</span>
-                          <span className="font-bold">{r.tz || "UTC"}</span>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-6">
+                        <div className="bg-[var(--bg-primary)]/40 p-4 rounded-2xl border border-[var(--accent)]/5">
+                          <span className="text-[9px] uppercase font-black text-[var(--text-secondary)] block mb-1 tracking-widest">Timezone</span>
+                          <span className="font-bold text-[var(--text-primary)]">{r.tz || "UTC"}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
-                          <div className="bg-black/10 p-3 rounded-xl">
-                            <span className="text-[9px] uppercase font-black opacity-40 block mb-1">Spotify Reset</span>
-                            <span className="font-bold">{r.spotifyReset}</span>
+                          <div className="bg-[var(--bg-primary)]/40 p-4 rounded-2xl border border-[var(--accent)]/5">
+                            <span className="text-[9px] uppercase font-black text-[var(--text-secondary)] block mb-1 tracking-widest">Spotify</span>
+                            <span className="font-bold text-[var(--text-primary)]">{r.spotifyReset}</span>
                           </div>
-                          <div className="bg-black/10 p-3 rounded-xl">
-                            <span className="text-[9px] uppercase font-black opacity-40 block mb-1">Apple Reset</span>
-                            <span className="font-bold">{r.appleReset || "N/A"}</span>
+                          <div className="bg-[var(--bg-primary)]/40 p-4 rounded-2xl border border-[var(--accent)]/5">
+                            <span className="text-[9px] uppercase font-black text-[var(--text-secondary)] block mb-1 tracking-widest">Apple</span>
+                            <span className="font-bold text-[var(--text-primary)]">{r.appleReset || "N/A"}</span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
-                        <div>
-                          <span className="text-[9px] uppercase font-black opacity-40 block mb-2">Spotify Playlists</span>
-                          <div className="flex flex-wrap gap-1">
-                            {r.playlists.spotify?.map((p, i) => (
-                              <span key={i} className="text-[8px] px-2 py-1 bg-green-500/10 text-green-500 rounded-full font-bold">{p.name}</span>
-                            ))}
+                      <div>
+                        <span className="text-[9px] uppercase font-black text-[var(--text-secondary)] block mb-2">Regional Focus Playlists</span>
+                        <div className="flex flex-wrap gap-2">
+                          <div className="flex items-center gap-1.5 bg-[#1DB954]/5 text-[#1DB954] px-3 py-1.5 rounded-xl border border-[#1DB954]/20 backdrop-blur-sm">
+                            <span className="text-[10px] font-black">{r.playlists?.spotify?.length || 0}</span>
+                            <span className="text-[8px] font-black uppercase tracking-tighter opacity-80">Spotify</span>
                           </div>
-                        </div>
-                        <div>
-                          <span className="text-[9px] uppercase font-black opacity-40 block mb-2">Apple Playlists</span>
-                          <div className="flex flex-wrap gap-1">
-                            {r.playlists.appleMusic?.map((p, i) => (
-                              <span key={i} className="text-[8px] px-2 py-1 bg-red-500/10 text-red-500 rounded-full font-bold">{p.name}</span>
-                            ))}
+                          <div className="flex items-center gap-1.5 bg-[#FA2D48]/5 text-[#FA2D48] px-3 py-1.5 rounded-xl border border-[#FA2D48]/20 backdrop-blur-sm">
+                            <span className="text-[10px] font-black">{r.playlists?.appleMusic?.length || 0}</span>
+                            <span className="text-[8px] font-black uppercase tracking-tighter opacity-80">Apple</span>
                           </div>
                         </div>
                       </div>
@@ -666,9 +814,9 @@ function AdminPanel() {
               <div className="bg-[var(--card-bg)]/80 backdrop-blur-2xl p-6 rounded-3xl border border-[var(--accent)]/40 shadow-xl h-fit lg:sticky lg:top-12">
                 <h3 className="text-lg font-black mb-6 uppercase tracking-tight text-[var(--accent)]">Record Regional Info</h3>
                 <form onSubmit={handleAddRegion} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="relative">
-                      <label className="text-[9px] font-black uppercase opacity-40 ml-1">Country</label>
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Country</label>
                       <input 
                         type="text" 
                         placeholder="Search country..."
@@ -679,16 +827,16 @@ function AdminPanel() {
                           setNewRegion({...newRegion, country: e.target.value});
                           setShowCountryDrop(true);
                         }}
-                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                       />
                       {showCountryDrop && (
-                        <div className="absolute top-full left-0 w-full mt-1 bg-[var(--card-bg)]/90 backdrop-blur-xl border border-[var(--accent)]/20 rounded-xl max-h-40 overflow-y-auto z-[60] shadow-2xl">
+                        <div className="absolute top-full left-0 w-full mt-1 bg-[var(--card-bg)]/90 backdrop-blur-xl border border-[var(--accent)]/40 rounded-xl max-h-40 overflow-y-auto z-[60] shadow-2xl">
                           {COUNTRIES.filter(c => c.toLowerCase().includes(countrySearch.toLowerCase())).map(c => (
                             <button
                               key={c}
                               type="button"
                               onClick={() => handleCountrySelect(c)}
-                              className="w-full text-left px-4 py-2 text-xs hover:bg-[var(--accent)] hover:text-black transition-all"
+                              className="w-full text-left px-4 py-2 text-xs hover:bg-[var(--accent)] hover:text-black transition-all text-[var(--text-primary)]"
                             >
                               {c}
                             </button>
@@ -697,13 +845,13 @@ function AdminPanel() {
                       )}
                     </div>
                     <div>
-                      <label className="text-[9px] font-black uppercase opacity-40 ml-1">Region</label>
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Region</label>
                       <input 
                         type="text" 
                         placeholder="South Asia"
                         value={newRegion.region}
                         onChange={(e) => handlePresetChange(e.target.value)}
-                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                         list="region-presets"
                       />
                       <datalist id="region-presets">
@@ -711,104 +859,107 @@ function AdminPanel() {
                       </datalist>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Streaming Goals</label>
+                    <input 
+                      type="text" 
+                      placeholder="Reach #1 on Top 50 India..."
+                      value={newRegion.goal}
+                      onChange={(e) => setNewRegion({...newRegion, goal: e.target.value})}
+                      className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[9px] font-black uppercase opacity-40 ml-1">Hashtags</label>
-                      <input 
-                        type="text" 
-                        placeholder="#BTS_India #SouthAsia_Stream"
-                        value={newRegion.hashtag}
-                        onChange={(e) => setNewRegion({...newRegion, hashtag: e.target.value})}
-                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-black uppercase opacity-40 ml-1">Timezone (IANA)</label>
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Timezone (IANA)</label>
                       <input 
                         type="text" 
                         placeholder="Asia/Kolkata"
                         value={newRegion.tz}
                         onChange={(e) => setNewRegion({...newRegion, tz: e.target.value})}
-                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Google Form URL</label>
+                      <input 
+                        type="text" 
+                        placeholder="https://forms.gle/..."
+                        value={newRegion.gFormUrl}
+                        onChange={(e) => setNewRegion({...newRegion, gFormUrl: e.target.value})}
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                       />
                     </div>
                   </div>
-                   <div className="grid grid-cols-2 gap-3">
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[9px] font-black uppercase opacity-40 ml-1">Spotify Reset</label>
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Spotify Reset</label>
                       <input 
                         type="text" 
                         placeholder="12:30 AM IST"
                         value={newRegion.spotifyReset}
                         onChange={(e) => setNewRegion({...newRegion, spotifyReset: e.target.value})}
-                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                       />
                     </div>
                     <div>
-                      <label className="text-[9px] font-black uppercase opacity-40 ml-1">Apple Reset</label>
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Apple Reset</label>
                       <input 
                         type="text" 
                         placeholder="1:30 AM IST"
                         value={newRegion.appleReset}
                         onChange={(e) => setNewRegion({...newRegion, appleReset: e.target.value})}
-                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                       />
                     </div>
                   </div>
-
-                  <div>
-                    <label className="text-[9px] font-black uppercase opacity-40 ml-1">Google Form URL</label>
-                    <input 
-                      type="text" 
-                      placeholder="https://forms.gle/..."
-                      value={newRegion.gFormUrl}
-                      onChange={(e) => setNewRegion({...newRegion, gFormUrl: e.target.value})}
-                      className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
-                    />
-                  </div>
                   
-                   <div className="grid grid-cols-1 gap-8 border-t border-white/5 pt-6">
-                    <div>
-                      <label className="text-[9px] font-black uppercase opacity-40 ml-1 block mb-3">Spotify Playlists (Max 6)</label>
-                      <div className="space-y-2">
-                        {spotifyPlaylists.map((p, i) => (
-                          <div key={i} className="flex gap-2">
-                            <input 
-                              type="text" 
-                              placeholder={`Name #${i+1}`}
-                              value={p.name}
-                              onChange={(e) => updatePlaylist(i, "name", e.target.value)}
-                              className="flex-[2] bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2 rounded-lg text-[10px] focus:outline-none focus:border-[var(--accent)] transition-all"
-                            />
-                            <input 
-                              type="text" 
-                              placeholder="URL"
-                              value={p.url}
-                              onChange={(e) => updatePlaylist(i, "url", e.target.value)}
-                              className="flex-[3] bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2 rounded-lg text-[10px] focus:outline-none focus:border-[var(--accent)] transition-all"
-                            />
-                          </div>
-                        ))}
+                  {/* Playlist management restored and expanded to 20 slots */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Focus Playlists (20 Slots)</label>
+                      <div className="flex bg-[var(--bg-primary)] p-1 rounded-xl border border-[var(--accent)]/20 shadow-inner">
+                        <button 
+                          type="button"
+                          onClick={() => setPlaylistPlatform("spotify")}
+                          className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${playlistPlatform === 'spotify' ? 'bg-[#1DB954] text-black shadow-lg shadow-[#1DB954]/20' : 'opacity-40 hover:opacity-100 hover:text-[#1DB954]'}`}
+                        >
+                          Spotify
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setPlaylistPlatform("appleMusic")}
+                          className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${playlistPlatform === 'appleMusic' ? 'bg-[#FA2D48] text-white shadow-lg shadow-[#FA2D48]/20' : 'opacity-40 hover:opacity-100 hover:text-[#FA2D48]'}`}
+                        >
+                          Apple
+                        </button>
                       </div>
                     </div>
-                    <div>
-                      <label className="text-[9px] font-black uppercase opacity-40 ml-1 block mb-3">Apple Playlists (Max 6)</label>
-                      <div className="space-y-2">
-                        {applePlaylists.map((p, i) => (
-                          <div key={i} className="flex gap-2">
+
+                    <div className="bg-[var(--bg-primary)]/50 p-4 rounded-2xl border border-[var(--accent)]/10 max-h-[300px] overflow-y-auto custom-scrollbar shadow-inner">
+                      <div className="grid grid-cols-1 gap-3">
+                        {(newRegion.playlists[playlistPlatform] || []).map((pl, idx) => (
+                          <div key={idx} className="bg-[var(--card-bg)]/40 p-3.5 rounded-xl space-y-2.5 border border-[var(--accent)]/5 shadow-sm hover:border-[var(--accent)]/20 transition-all group/slot">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[8px] font-black uppercase opacity-30 tracking-widest group-hover/slot:opacity-60 transition-opacity">#{idx + 1} Focus Slot</span>
+                              <div className={`w-1 h-1 rounded-full ${playlistPlatform === 'spotify' ? 'bg-[#1DB954]' : 'bg-[#FA2D48]'} opacity-20`}></div>
+                            </div>
                             <input 
-                              type="text" 
-                              placeholder={`Name #${i+1}`}
-                              value={p.name}
-                              onChange={(e) => updateApplePlaylist(i, "name", e.target.value)}
-                              className="flex-[2] bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2 rounded-lg text-[10px] focus:outline-none focus:border-[var(--accent)] transition-all"
+                              type="text"
+                              placeholder="Playlist Name"
+                              value={pl.name}
+                              onChange={(e) => updatePlaylistField(playlistPlatform, idx, "name", e.target.value)}
+                              className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/10 p-2.5 rounded-lg text-[11px] font-bold focus:outline-none focus:border-[var(--accent)] transition-all placeholder:opacity-20"
                             />
                             <input 
-                              type="text" 
-                              placeholder="URL"
-                              value={p.url}
-                              onChange={(e) => updateApplePlaylist(i, "url", e.target.value)}
-                              className="flex-[3] bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2 rounded-lg text-[10px] focus:outline-none focus:border-[var(--accent)] transition-all"
+                              type="text"
+                              placeholder="Streaming URL (https://...)"
+                              value={pl.url}
+                              onChange={(e) => updatePlaylistField(playlistPlatform, idx, "url", e.target.value)}
+                              className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/10 p-2.5 rounded-lg text-[10px] font-mono focus:outline-none focus:border-[var(--accent)] transition-all placeholder:opacity-20 opacity-60 focus:opacity-100"
                             />
                           </div>
                         ))}
@@ -818,13 +969,12 @@ function AdminPanel() {
 
                   <button 
                     type="submit"
-                    className="w-full bg-[var(--accent)] text-white font-black py-4 rounded-xl shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    className="w-full bg-[var(--accent)] text-black dark:text-black font-black py-4 rounded-xl shadow-lg shadow-[var(--accent)]/20 hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest text-xs"
                   >
-                    SAVE REGIONAL INFO
+                    Save Regional Info 💜
                   </button>
                 </form>
               </div>
-
             </div>
           </section>
         )}
@@ -837,6 +987,21 @@ function AdminPanel() {
             toast={toast}
           />
         )}
+        {activeTab === "gallery" && (
+          <GalleryManagerSection 
+            galleryImages={galleryImages} 
+            deleteGalleryImage={deleteGalleryImage}
+            newGalleryImage={newGalleryImage}
+            setNewGalleryImage={setNewGalleryImage}
+            handleAddGalleryImage={handleAddGalleryImage}
+            resetGallery={resetGallery}
+            updateGalleryImage={updateGalleryImage}
+            editingGallerySrc={editingGallerySrc}
+            setEditingGallerySrc={setEditingGallerySrc}
+            editingGalleryType={editingGalleryType}
+            setEditingGalleryType={setEditingGalleryType}
+          />
+        )}
         {activeTab === "global" && (
           <GlobalConfigSection 
             regions={regions} 
@@ -844,6 +1009,7 @@ function AdminPanel() {
             battles={battles}
             liveBattles={liveBattles}
             timeline={events}
+            galleryImages={galleryImages}
             toast={toast}
           />
         )}
@@ -855,33 +1021,43 @@ function AdminPanel() {
 // Sub-component for individual mod cards to handle local editing state
 function ModCard({ mod, onToggle, onUpdate, toast }) {
   const [localName, setLocalName] = useState(mod.name);
-  const [localLinks, setLocalLinks] = useState({ ...mod.links });
+  const [localAccounts, setLocalAccounts] = useState([...(mod.accounts || [])]);
   const [hasChanges, setHasChanges] = useState(false);
-
-  // Sync with prop changes (e.g., after a reset)
+  
+  // Ensure we always have two slots, even if data is thin
   useEffect(() => {
+    let base = [...(mod.accounts || [])];
+    while(base.length < 2) base.push({ platform: "", url: "" });
+    setLocalAccounts(base.slice(0, 2));
     setLocalName(mod.name);
-    setLocalLinks({ ...mod.links });
     setHasChanges(false);
-  }, [mod.name, mod.links]);
+  }, [mod.name, mod.accounts]);
+
+  const handleAccountChange = (index, field, value) => {
+    const updated = [...localAccounts];
+    updated[index] = { ...updated[index], [field]: value };
+    setLocalAccounts(updated);
+    setHasChanges(true);
+  };
 
   const handleSave = () => {
-    onUpdate(mod.id, localName, localLinks);
+    onUpdate(mod.id, localName, localAccounts);
     setHasChanges(false);
     toast.show(`Changes saved for ${localName}! 💜`, "success");
   };
 
   return (
-    <div className="bg-[var(--card-bg)]/40 p-6 rounded-3xl border border-[var(--accent)]/20 flex flex-col gap-4">
-      <div className="flex justify-between items-start">
+    <div className="bg-[var(--card-bg)]/60 backdrop-blur-xl p-4 sm:p-8 rounded-[2rem] border border-[var(--accent)]/10 shadow-xl transition-all hover:border-[var(--accent)]/30 group/card">
+      <div className="flex justify-between items-center mb-6">
         <div>
+          <h3 className="text-[10px] font-black uppercase text-[var(--text-secondary)] ml-1 mb-1 tracking-widest">MODERATOR</h3>
           <input 
             type="text"
+            placeholder="Mod Name"
             value={localName}
             onChange={(e) => { setLocalName(e.target.value); setHasChanges(true); }}
-            className="bg-transparent border-b border-[var(--accent)]/20 font-bold text-lg focus:outline-none focus:border-[var(--accent)] transition-all w-full"
+            className="bg-transparent border-b border-transparent focus:border-[var(--accent)] text-2xl font-black focus:outline-none transition-all w-full text-[var(--text-primary)] tracking-tighter"
           />
-          <p className="text-[9px] uppercase font-black opacity-40 mt-1">Mod Identity</p>
         </div>
         <button 
           onClick={() => {
@@ -899,34 +1075,46 @@ function ModCard({ mod, onToggle, onUpdate, toast }) {
         </button>
       </div>
 
-      <div className="space-y-2 border-t border-white/5 pt-4">
-        <p className="text-[9px] uppercase font-black opacity-40 mb-2">Social Links</p>
-        {Object.keys(localLinks).map((platform) => (
-          <div key={platform} className="flex items-center gap-2">
-            <span className="w-16 text-[10px] font-bold opacity-60 uppercase">{platform}</span>
-            <input 
-              type="text"
-              value={localLinks[platform]}
-              onChange={(e) => {
-                setLocalLinks({ ...localLinks, [platform]: e.target.value });
-                setHasChanges(true);
-              }}
-              className="flex-1 bg-black/10 border border-white/5 p-1.5 rounded-lg text-[10px] focus:outline-none focus:border-[var(--accent)] transition-all"
-            />
-          </div>
-        ))}
+      <div className="space-y-4 border-t border-[var(--accent)]/10 pt-6 my-6">
+        <p className="text-[9px] uppercase font-black text-[var(--text-secondary)] tracking-widest ml-1">Help Desk Accounts</p>
+        <div className="grid grid-cols-1 gap-3">
+          {localAccounts.map((acc, i) => (
+            <div key={i} className="bg-[var(--bg-primary)]/40 p-4 rounded-2xl border border-[var(--accent)]/5 space-y-3 group/acc hover:border-[var(--accent)]/20 transition-all">
+              <div className="flex items-center gap-3">
+                <span className="text-[8px] font-black uppercase w-12 tracking-tighter text-[var(--text-secondary)]">SLOT {i+1}</span>
+                <input 
+                   type="text"
+                   placeholder="Platform (X, TG...)"
+                   value={acc.platform}
+                   onChange={(e) => handleAccountChange(i, "platform", e.target.value)}
+                   className="flex-1 bg-[var(--bg-primary)]/40 border border-[var(--accent)]/10 p-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest focus:outline-none focus:border-[var(--accent)] transition-all placeholder:opacity-20 text-[var(--text-primary)]"
+                 />
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[8px] font-black uppercase w-12 tracking-tighter text-[var(--text-secondary)]">URL</span>
+                <input 
+                  type="text"
+                  placeholder="https://..."
+                  value={acc.url}
+                  onChange={(e) => handleAccountChange(i, "url", e.target.value)}
+                  className="flex-1 bg-[var(--bg-primary)]/40 border border-[var(--accent)]/10 p-2.5 rounded-xl text-[10px] font-mono focus:outline-none focus:border-[var(--accent)] transition-all placeholder:opacity-20 text-[var(--text-primary)] opacity-80 focus:opacity-100"
+                />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <button 
         onClick={handleSave}
         disabled={!hasChanges}
-        className={`w-full py-2.5 rounded-xl text-[10px] font-black uppercase transition-all border-2
+        className={`w-full py-4 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all
           ${hasChanges 
-            ? "border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white" 
-            : "border-white/5 text-white/20 cursor-not-allowed opacity-50"}
+            ? "bg-[var(--accent)] text-black dark:text-black shadow-lg shadow-[var(--accent)]/20 hover:scale-[1.02] active:scale-[0.98]" 
+            : "bg-[var(--bg-primary)]/40 text-[var(--accent)]/20 cursor-not-allowed"}
         `}
       >
-        {hasChanges ? "Save Changes 💜" : "All Changes Saved"}
+        {hasChanges ? "Sync Changes 💜" : "Already Synced"}
       </button>
     </div>
   );
@@ -943,7 +1131,7 @@ function ModManagerSection({ mods, toggleStatus, updateModDetails, resetMods, to
         <h2 className="text-2xl font-bold">Help Desk Mod Manager</h2>
         <button 
           onClick={() => { if(confirm("Reset all mods to default?")) resetMods() }}
-          className="text-xs font-bold text-red-500 opacity-60 hover:opacity-100"
+          className="text-xs font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest"
         >
           Reset to Default
         </button>
@@ -964,8 +1152,8 @@ function ModManagerSection({ mods, toggleStatus, updateModDetails, resetMods, to
   );
 }
 
-function GlobalConfigSection({ regions, mods, battles, liveBattles, timeline, toast }) {
-  const config = JSON.stringify({ regions, mods, battles, liveBattles, timeline }, null, 2);
+function GlobalConfigSection({ regions, mods, battles, liveBattles, timeline, galleryImages, toast }) {
+  const config = JSON.stringify({ regions, mods, battles, liveBattles, timeline, galleryImages }, null, 2);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(config);
@@ -973,26 +1161,197 @@ function GlobalConfigSection({ regions, mods, battles, liveBattles, timeline, to
   };
 
   return (
-    <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex justify-between items-center mb-8">
+    <section className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20 px-1">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h2 className="text-2xl font-bold">Global Configuration</h2>
-          <p className="text-xs opacity-50 mt-1">Copy this JSON and host it as a GitHub Gist to push updates to all users.</p>
+          <h2 className="text-3xl font-black tracking-tighter uppercase text-[var(--accent)]">Global Config</h2>
+          <p className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mt-1">Export your curated configuration to host on GitHub Gist.</p>
         </div>
         <button 
           onClick={handleCopy}
-          className="bg-[var(--accent)] text-white font-black px-6 py-2 rounded-xl shadow-lg hover:scale-[1.05] transition-all flex items-center gap-2"
+          className="w-full md:w-auto bg-[var(--accent)] text-black dark:text-black font-black px-8 py-3 rounded-2xl shadow-xl shadow-[var(--accent)]/20 hover:scale-[1.05] active:scale-95 transition-all flex items-center justify-center gap-3 text-xs tracking-widest"
         >
           <span>📋</span> COPY JSON
         </button>
       </div>
 
-      <div className="bg-black/40 p-6 rounded-3xl border border-[var(--accent)]/20 shadow-2xl">
-        <pre className="text-[10px] md:text-sm font-mono overflow-x-auto max-h-[500px] overflow-y-auto whitespace-pre-wrap text-[var(--accent)]/80">
+      <div className="bg-[var(--bg-primary)]/40 backdrop-blur-xl p-8 rounded-[2.5rem] border border-[var(--accent)]/10 shadow-2xl relative overflow-hidden group">
+        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
+          <span className="text-9xl font-black italic">JSON</span>
+        </div>
+        <pre className="text-[10px] md:text-xs font-mono overflow-x-auto max-h-[600px] overflow-y-auto whitespace-pre-wrap text-[var(--accent)]/70 scrollbar-hide">
           {config}
         </pre>
       </div>
     </section>
+  );
+}
+
+function GalleryManagerSection({ 
+  galleryImages, deleteGalleryImage, newGalleryImage, setNewGalleryImage, handleAddGalleryImage, resetGallery, 
+  updateGalleryImage, editingGallerySrc, setEditingGallerySrc, editingGalleryType, setEditingGalleryType 
+}) {
+  return (
+    <section className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-2xl font-bold">Gallery Manager</h2>
+        <button 
+          onClick={() => { if(confirm("Reset gallery to default 69 image pool?")) resetGallery() }}
+          className="text-xs font-bold text-red-500 opacity-60 hover:opacity-100 uppercase tracking-widest"
+        >
+          Reset to Default
+        </button>
+      </div>
+
+      <div className="bg-[var(--card-bg)]/80 backdrop-blur-2xl p-4 sm:p-6 rounded-3xl border border-[var(--accent)]/40 shadow-xl mb-12">
+        <h3 className="text-lg font-black mb-4 uppercase tracking-tight text-[var(--accent)]">Add New Image</h3>
+        <form onSubmit={handleAddGalleryImage} className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Image Source URL</label>
+            <input 
+              type="text" 
+              placeholder="e.g. /assets/images/my_photo.jpg or https://..."
+              value={newGalleryImage.src}
+              onChange={(e) => setNewGalleryImage({...newGalleryImage, src: e.target.value})}
+              className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
+            />
+          </div>
+          <div className="w-full md:w-48">
+            <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Orientation Type</label>
+            <select 
+              value={newGalleryImage.type}
+              onChange={(e) => setNewGalleryImage({...newGalleryImage, type: e.target.value})}
+              className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all appearance-none cursor-pointer text-[var(--text-primary)]"
+            >
+              <option value="square">Square (1:1)</option>
+              <option value="portrait">Portrait (Tall)</option>
+              <option value="landscape">Landscape (Wide)</option>
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button 
+              type="submit"
+              className="w-full md:w-auto bg-[var(--accent)] text-black dark:text-black font-black px-8 py-3 rounded-xl shadow-lg shadow-[var(--accent)]/20 hover:scale-[1.05] active:scale-95 transition-all text-xs tracking-widest uppercase h-[46px]"
+            >
+              Add To Pool 💜
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        {galleryImages.map((img, idx) => (
+          <div key={idx} className="group relative bg-[var(--bg-primary)] rounded-2xl border border-[var(--accent)]/20 overflow-hidden shadow-lg hover:border-[var(--accent)]/60 transition-all flex flex-col aspect-square">
+            {editingGallerySrc === img.src ? (
+              /* --- EDIT MODE --- */
+              <div className="absolute inset-0 z-30 bg-[var(--bg-primary)]/95 backdrop-blur-md p-4 flex flex-col justify-center items-center gap-4 animate-in fade-in duration-200">
+                <div className="w-full">
+                  <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1 mb-1 block">Orientation</label>
+                  <select 
+                    value={editingGalleryType}
+                    onChange={(e) => setEditingGalleryType(e.target.value)}
+                    className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 text-[var(--text-primary)] p-2.5 rounded-xl text-xs focus:outline-none focus:border-[var(--accent)] transition-all appearance-none cursor-pointer [&>option]:bg-[var(--bg-primary)] [&>option]:text-[var(--text-primary)]"
+                  >
+                    <option value="square">Square (1:1)</option>
+                    <option value="portrait">Portrait (Tall)</option>
+                    <option value="landscape">Landscape (Wide)</option>
+                  </select>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2 w-full">
+                  <button 
+                    onClick={() => {
+                      updateGalleryImage(img.src, { type: editingGalleryType });
+                      setEditingGallerySrc(null);
+                    }}
+                    className="flex-1 bg-[var(--accent)] text-black font-black py-2 rounded-xl text-[10px] uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all"
+                  >
+                    Save
+                  </button>
+                  <button 
+                    onClick={() => setEditingGallerySrc(null)}
+                    className="flex-1 bg-[var(--accent)]/10 text-[var(--text-primary)] font-black py-2 rounded-xl text-[10px] uppercase tracking-widest hover:bg-[var(--accent)]/20 transition-all border border-[var(--accent)]/20"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* --- VIEW MODE --- */
+              <>
+                <div className="absolute top-2 left-2 z-10 flex gap-1">
+                  <span className={`px-2 py-1 rounded bg-black/60 backdrop-blur-md text-white text-[9px] font-black uppercase tracking-widest shadow-xl border border-white/10 ${
+                    img.type === "portrait" ? "text-blue-300" : img.type === "landscape" ? "text-green-300" : "text-yellow-300"
+                  }`}>
+                    {img.type}
+                  </span>
+                </div>
+                
+                <div className="absolute top-2 right-2 z-10 flex gap-1 sm:opacity-0 group-hover:opacity-100 transition-all">
+                  <button 
+                    onClick={() => {
+                      setEditingGallerySrc(img.src);
+                      setEditingGalleryType(img.type);
+                    }}
+                    className="w-7 h-7 bg-[var(--accent)]/80 hover:bg-[var(--accent)] text-black rounded-full flex items-center justify-center shadow-xl scale-75 hover:scale-110 active:scale-90"
+                    title="Edit Orientation"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                  </button>
+                  <button 
+                    onClick={() => { if(confirm("Are you sure you want to remove this image from the gallery?")) deleteGalleryImage(img.src) }}
+                    className="w-7 h-7 bg-red-500/80 hover:bg-red-500 text-white rounded-full flex items-center justify-center shadow-xl scale-75 hover:scale-110 active:scale-90"
+                    title="Remove Image"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                </div>
+              </>
+            )}
+
+            <img 
+              src={img.src} 
+              alt="Gallery thumbnail" 
+              className={`w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-500 pointer-events-none`}
+              loading="lazy"
+            />
+            
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-8 pb-2 translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+              <p className="text-[8px] text-white overflow-hidden text-ellipsis whitespace-nowrap opacity-70" title={img.src}>
+                {img.src.split("/").pop()}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {galleryImages.length === 0 && (
+        <div className="text-center py-24 opacity-40 border-2 border-dashed border-[var(--accent)]/10 rounded-3xl">
+          <p className="text-xl italic">No images in gallery pool.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// Helper component for the dropdown menu
+function MenuButton({ tab, label, current, set, close }) {
+  const isActive = current === tab;
+  return (
+    <button
+      onClick={() => { set(tab); close(); }}
+      className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-widest transition-all ${
+        isActive 
+          ? "bg-[var(--accent)] text-black" 
+          : "text-[var(--text-primary)] hover:bg-[var(--accent)]/10"
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 
