@@ -4,10 +4,10 @@ import { DATA_SOURCE_URL } from "../constants";
 const INITIAL_BATTLES = [];
 
 const INITIAL_LIVE_BATTLES = [
-  { id: "lb1", title: "SOUTH ASIA vs AFRICA", goal: "320M", progress: 0, platform: "Spotify", status: "Yet to Start" },
-  { id: "lb2", title: "OCEANIA vs WEST ASIA", goal: "320M", progress: 0, platform: "Spotify", status: "Yet to Start" },
-  { id: "lb3", title: "NORTH AMERICA vs SOUTH & CENTRAL AMERICA", goal: "320M", progress: 0, platform: "Spotify", status: "Yet to Start" },
-  { id: "lb4", title: "EUROPE vs EAST & SOUTH EAST ASIA", goal: "320M", progress: 0, platform: "Spotify", status: "Yet to Start" },
+  { id: "lb1", title: "SOUTH ASIA vs CENTRAL & SOUTH AMERICA", goal: "320M", progress: 0, platform: "Spotify", status: "Yet to Start" },
+  { id: "lb2", title: "OCEANIA vs WEST & CENTRAL ASIA", goal: "320M", progress: 0, platform: "Spotify", status: "Yet to Start" },
+  { id: "lb3", title: "NORTH AMERICA vs EAST & SOUTH EAST ASIA", goal: "320M", progress: 0, platform: "Spotify", status: "Yet to Start" },
+  { id: "lb4", title: "EUROPE vs AFRICA", goal: "320M", progress: 0, platform: "Spotify", status: "Yet to Start" },
 ];
 
 export default function useBattles() {
@@ -34,7 +34,8 @@ export default function useBattles() {
       }
 
       const saved = localStorage.getItem("battleData");
-      if (saved) setBattles(JSON.parse(saved));
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (parsed && parsed.length > 0) setBattles(parsed);
       else {
         setBattles(INITIAL_BATTLES);
         localStorage.setItem("battleData", JSON.stringify(INITIAL_BATTLES));

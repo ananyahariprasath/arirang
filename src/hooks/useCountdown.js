@@ -7,7 +7,7 @@ export default function useCountdown() {
   // So UTC time = 2026-03-20T04:00:00Z
 
   //const targetDate = new Date("2026-03-20T04:00:00Z").getTime();
-  const targetDate = new Date(Date.now() + 5000).getTime();
+  const targetDate = new Date(Date.now() ).getTime();
 
 
   const [timeLeft, setTimeLeft] = useState(getTimeRemaining());

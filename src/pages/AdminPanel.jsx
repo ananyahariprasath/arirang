@@ -28,7 +28,8 @@ function AdminPanel() {
     regions: "",
     target: "",
     progress: 100,
-    reachedTarget: true
+    reachedTarget: true,
+    winner: ""
   });
 
   // Live Battles Editor State (one entry per live battle)
@@ -110,7 +111,7 @@ function AdminPanel() {
     };
 
     addBattle(battleObj);
-    setNewBattle({ date: "", time: "", regions: "", target: "", progress: 100, reachedTarget: true });
+    setNewBattle({ date: "", time: "", regions: "", target: "", progress: 100, reachedTarget: true, winner: "" });
   };
 
   const handleAddTimelineEvent = (e) => {
@@ -383,6 +384,10 @@ function AdminPanel() {
                               </div>
                             </div>
                           </div>
+                          <div>
+                            <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Winner (Region/Team Name)</label>
+                            <input type="text" value={editingBattle.winner || ""} onChange={e => setEditingBattle({...editingBattle, winner: e.target.value})} placeholder="e.g. SOUTH ASIA" className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30" />
+                          </div>
                           <div className="flex gap-2 pt-1">
                             <button onClick={() => { updateBattle(battle.id, editingBattle); setEditingBattleId(null); toast.show("Battle record updated! 💜", "success"); }} className="flex-1 bg-[var(--accent)] text-black font-black py-2 rounded-xl text-xs hover:scale-[1.02] active:scale-95 transition-all">Save Changes</button>
                             <button onClick={() => setEditingBattleId(null)} className="px-4 py-2 rounded-xl text-xs font-bold border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all">Cancel</button>
@@ -401,6 +406,12 @@ function AdminPanel() {
                                 <span key={r} className="text-[9px] px-2 py-0.5 bg-[var(--accent)]/10 text-[var(--accent)] rounded font-black uppercase">{r}</span>
                               ))}
                             </div>
+                            {battle.winner && (
+                              <div className="mt-2 flex items-center gap-1.5">
+                                <span className="text-[8px] font-black uppercase text-emerald-400 tracking-widest">Winner:</span>
+                                <span className="text-[10px] font-black text-white">{battle.winner}</span>
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-4">
                             <div className="flex items-center gap-4">
@@ -592,6 +603,16 @@ function AdminPanel() {
                         className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                       />
                     </div>
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Winner</label>
+                      <input 
+                        type="text" 
+                        placeholder="e.g. SOUTH ASIA"
+                        value={newBattle.winner}
+                        onChange={(e) => setNewBattle({...newBattle, winner: e.target.value})}
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
+                      />
+                    </div>
                      <button 
                       type="submit"
                       className="w-full bg-[var(--accent)] text-black dark:text-black font-black py-3 rounded-xl text-xs hover:scale-[1.02] active:scale-[0.98] transition-all mt-2 shadow-lg shadow-[var(--accent)]/20 uppercase tracking-widest"
@@ -665,7 +686,7 @@ function AdminPanel() {
                                 <span className="text-sm font-bold">{ev.time} KST</span>
                                 <span className="text-[9px] px-2 py-0.5 bg-[var(--accent)]/20 rounded font-black uppercase tracking-widest">{ev.platform}</span>
                               </div>
-                              <p className="text-sm opacity-80 font-medium">{ev.event}</p>
+                              <p className="text-sm opacity-80 font-medium whitespace-pre-line">{ev.event}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 sm:ml-4">

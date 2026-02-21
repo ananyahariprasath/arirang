@@ -61,7 +61,7 @@ function Timeline() {
                   
                   <div className="bg-[var(--accent)]/5 border border-[var(--accent)]/10 rounded-xl p-3 px-4 transition-all group-hover:bg-[var(--accent)]/10 group-hover:border-[var(--accent)]/30 group-hover:-translate-y-0.5">
                     <div className="flex justify-between items-start gap-4">
-                      <p className="text-xs md:text-sm font-bold leading-tight opacity-90">{ev.event}</p>
+                      <p className="text-xs md:text-sm font-bold leading-tight opacity-90 whitespace-pre-line">{ev.event}</p>
                       <span className="text-[8px] px-1.5 py-0.5 bg-[var(--accent)]/10 text-[var(--accent)] rounded font-black uppercase tracking-widest whitespace-nowrap">
                         {ev.platform}
                       </span>

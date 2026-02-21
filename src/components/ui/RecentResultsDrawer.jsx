@@ -38,6 +38,15 @@ function RecentResultsDrawer({ onClose }) {
                   <div>
                     <div className="text-xs font-bold">{battle.date}</div>
                     <div className="text-[9px] opacity-50 uppercase font-bold">{battle.regions.join(", ")}</div>
+                    {battle.winner ? (
+                      <div className="mt-1 flex items-center gap-1">
+                        <span className="text-[7px] font-black uppercase text-emerald-400 tracking-widest bg-emerald-500/10 px-1.5 py-0.5 rounded">Winner: {battle.winner}</span>
+                      </div>
+                    ) : battle.reachedTarget && (
+                      <div className="mt-1 flex items-center gap-1">
+                        <span className="text-[7px] font-black uppercase text-white/40 tracking-widest bg-white/5 px-1.5 py-0.5 rounded italic">Pending Winner</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="text-right flex items-center gap-3">
@@ -62,7 +71,7 @@ function RecentResultsDrawer({ onClose }) {
                   <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                 </svg>
               </div>
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent)]">No Battles Found</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-primary)]">Battles begin on March 20, 2026 13:00 KST</p>
               <p className="text-[8px] font-bold uppercase tracking-widest mt-1 opacity-50">Records will appear here once logged</p>
             </div>
           )}

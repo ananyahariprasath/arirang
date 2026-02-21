@@ -1,7 +1,7 @@
 import { useState } from "react";
 import useRegionalData from "../../hooks/useRegionalData";
-import { COUNTRY_PRESETS, COUNTRY_REGION_MAP, COUNTRY_TZ_MAP, FOCUS_PLAYLISTS, GLOBAL_DEFAULT } from "../../constants";
-import { formatResetTime } from "../../utils/time";
+import { COUNTRY_PRESETS, COUNTRY_REGION_MAP, COUNTRY_TZ_MAP, FOCUS_PLAYLISTS, GLOBAL_DEFAULT, COUNTRY_MULTI_TZ_MAP } from "../../constants";
+import { formatResetTime, convertKSTToLocal, convertSpotifyReset } from "../../utils/time";
 
 function CountryModal({ selectedCountry, onClose }) {
   const [activePlatform, setActivePlatform] = useState("spotify");
@@ -24,6 +24,8 @@ function CountryModal({ selectedCountry, onClose }) {
     gFormUrl: GLOBAL_DEFAULT.gFormUrl,
     playlists: GLOBAL_DEFAULT.playlists
   };
+  
+  const timezones = COUNTRY_MULTI_TZ_MAP[selectedCountry] || [data.tz];
 
   const currentPlaylists = (data.playlists || FOCUS_PLAYLISTS)[activePlatform === "spotify" ? "spotify" : "appleMusic"] || [];
 
@@ -65,13 +67,26 @@ function CountryModal({ selectedCountry, onClose }) {
             <p className="text-[10px] uppercase font-bold text-[var(--text-primary)] opacity-60 mb-2">Global Goals</p>
             <p className="text-sm font-bold text-[var(--accent)] dark:text-[var(--lavender)] break-words leading-relaxed">{data.goal || GLOBAL_DEFAULT.goal}</p>
           </div>
-          <div className="bg-[var(--bg-secondary)]/50 border border-[var(--accent)]/10 rounded-2xl p-5 flex justify-between items-center">
-            <div>
-              <p className="text-[10px] uppercase font-bold text-[var(--text-primary)] opacity-60 mb-1">Spotify Reset</p>
-              <p className="text-lg font-black tracking-tight">{formatResetTime(data.spotifyReset, data.tz)}</p>
+          <div className="bg-[var(--bg-secondary)]/50 border border-[var(--accent)]/10 rounded-2xl p-5 flex justify-between items-start gap-4">
+            <div className="flex-1 max-h-[160px] overflow-y-auto no-scrollbar">
+              <p className="text-[10px] uppercase font-bold text-[var(--text-primary)] opacity-60 mb-1"> Album Release Time</p>
+              <div className="space-y-1">
+                {timezones.map(tz => (
+                  <p key={tz} className="text-lg font-black tracking-tight">{convertKSTToLocal(tz)}</p>
+                ))}
+              </div>
             </div>
-            <div className="text-right opacity-30">
-              <p className="text-[9px] font-black uppercase tracking-widest">{data.tz}</p>
+            <div className="w-px self-stretch bg-[var(--accent)]/10" />
+            <div className="flex-1 max-h-[160px] overflow-y-auto no-scrollbar">
+              <p className="text-[10px] uppercase font-bold text-[var(--text-primary)] opacity-60 mb-1">Spotify Reset</p>
+              <div className="space-y-1">
+                {timezones.map(tz => (
+                  <p key={tz} className="text-lg font-black tracking-tight">{convertSpotifyReset(tz)}</p>
+                ))}
+              </div>
+            </div>
+            <div className="text-right opacity-30 sticky top-0">
+              <p className="text-[9px] font-black uppercase tracking-widest">{timezones.length > 1 ? "Multi-TZ" : data.tz}</p>
             </div>
           </div>
         </div>

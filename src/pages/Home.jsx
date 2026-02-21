@@ -12,6 +12,8 @@ import SupportDrawer from "../components/ui/SupportDrawer";
 import RecentResultsDrawer from "../components/ui/RecentResultsDrawer";
 import VerticalTabs from "../components/ui/VerticalTabs";
 import Gallery from "../components/post-expiry/Gallery";
+import BattleWinnerModal from "../components/modals/BattleWinnerModal";
+import useBattles from "../hooks/useBattles";
 import YoutubeEmbed from "../components/section-1/YoutubeEmbed";
 import LanguageDropdown from "../components/section-1/LanguageDropdown";
 import PreSaveQR from "../components/section-1/PreSaveQR";
@@ -23,6 +25,7 @@ function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRecentBattlesOpen, setIsRecentBattlesOpen] = useState(false);
   const [isContactOpen, setIsContactOpen] = useState(false);
+  const [isWinnerModalOpen, setIsWinnerModalOpen] = useState(false);
 
   const [localNow, setLocalNow] = useState("");
   const [timeZone, setTimeZone] = useState("");
@@ -49,6 +52,14 @@ function Home() {
   }, []);
 
   const { isExpired } = useCountdown();
+  const { battles, loading } = useBattles();
+
+  // Trigger Winner Modal on entry if there are previous results
+  useEffect(() => {
+    // Always show the modal on first entry, even if history is empty
+    // The modal itself will handle the "Coming Soon" state
+    setIsWinnerModalOpen(true);
+  }, []);
 
   const handleCountrySelect = (country) => {
     setSelectedCountry(country);
@@ -166,6 +177,13 @@ function Home() {
         <CountryModal
           selectedCountry={selectedCountry}
           onClose={handleCloseModal}
+        />
+      )}
+
+      {isWinnerModalOpen && (
+        <BattleWinnerModal 
+          winners={battles ? battles.slice(0, 4) : []} 
+          onClose={() => setIsWinnerModalOpen(false)} 
         />
       )}
     </div>
