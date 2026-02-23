@@ -82,15 +82,15 @@ function Home({ onNavigateToProof }) {
   };
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] relative flex flex-col">
+    <div className="min-h-screen lg:h-screen lg:pb-20 lg:overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] relative flex flex-col">
       <Header onToggleSection={handleToggleSection} />
 
       {/* Main Content Area */}
-      <section className="flex-1 mt-2 px-4 md:px-8 lg:px-12 relative z-20 pb-24 lg:pb-0 lg:overflow-hidden">
-        <div className="max-w-[1800px] mx-auto lg:h-full lg:overflow-hidden">
+      <section className="flex-1 mt-2 px-4 md:px-8 lg:px-12 relative z-20 pb-24 lg:pb-0 lg:min-h-0 lg:overflow-hidden">
+        <div className="max-w-[1800px] mx-auto lg:h-full lg:min-h-0 lg:overflow-hidden">
           
           {/* 3-Column Layout Container */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr_1fr] gap-6 lg:h-full items-stretch lg:pr-12 pb-6 lg:pb-20 lg:overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr_1fr] gap-6 lg:h-full lg:min-h-0 items-stretch lg:pr-12 pb-6 lg:pb-0 lg:overflow-hidden">
 
             {/* Column 1: Pre-Countdown (or Gallery) */}
             <div className={`lg:h-full flex flex-col lg:overflow-hidden ${isExpired ? 'order-last lg:order-none' : ''}`}>
@@ -123,7 +123,7 @@ function Home({ onNavigateToProof }) {
             </div>
 
             {/* Column 2: Streaming Map (Center) */}
-            <div className="lg:h-full flex flex-col gap-4 lg:overflow-hidden">
+            <div className="lg:h-full lg:min-h-0 flex flex-col gap-4 lg:overflow-hidden">
               <CountryDropdown
                 selectedCountry={selectedCountry}
                 onSelect={handleCountrySelect}
@@ -134,8 +134,8 @@ function Home({ onNavigateToProof }) {
             </div>
 
             {/* Column 3: Live Battle Cards (Right) */}
-            <div className="flex flex-col gap-2 lg:h-full lg:overflow-hidden">
-              <div className="h-[40px] flex items-center justify-center shrink-0">
+            <div className="flex flex-col gap-2 lg:h-full lg:min-h-0 lg:overflow-hidden">
+              <div className="h-[32px] flex items-center justify-center shrink-0">
                 <h2 className="text-lg font-black text-[var(--accent)] uppercase tracking-widest px-2">Live Battles</h2>
               </div>
               {/* Mobile: natural height stacked cards; Desktop: fills column */}
@@ -195,3 +195,4 @@ function Home({ onNavigateToProof }) {
 }
 
 export default Home;
+

@@ -71,9 +71,27 @@ function AdminViewPanel() {
     }).sort((a, b) => new Date(b.submissionTime) - new Date(a.submissionTime));
   }, [submissions, filters]);
 
+  // Calculate totals for filtered submissions
+  const streamTotals = useMemo(() => {
+    return filteredSubmissions.reduce((acc, s) => ({
+      albumStreams: acc.albumStreams + (s.albumStreamCount || 0),
+      titleStreams: acc.titleStreams + (s.titleTrackStreamCount || 0)
+    }), { albumStreams: 0, titleStreams: 0 });
+  }, [filteredSubmissions]);
+
   return (
     <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <h2 className="text-2xl font-bold mb-8">Proof Submissions ({filteredSubmissions.length})</h2>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <h2 className="text-2xl font-bold">Proof Submissions ({filteredSubmissions.length})</h2>
+        <div className="flex flex-wrap gap-4 text-sm font-bold">
+          <span className="bg-[var(--accent)]/10 text-[var(--accent)] px-4 py-2 rounded-xl">
+            Total Album Streams: <span className="text-[var(--accent)]">{streamTotals.albumStreams.toLocaleString()}</span>
+          </span>
+          <span className="bg-[var(--accent)]/10 text-[var(--accent)] px-4 py-2 rounded-xl">
+            Total Title Streams: <span className="text-[var(--accent)]">{streamTotals.titleStreams.toLocaleString()}</span>
+          </span>
+        </div>
+      </div>
 
       {/* Filters */}
       <div className="bg-[var(--card-bg)]/60 backdrop-blur-xl p-6 rounded-3xl border border-[var(--accent)]/20 mb-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
