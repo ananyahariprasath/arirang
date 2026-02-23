@@ -1,17 +1,25 @@
 import { useState, useEffect } from "react";
 import Home from "./pages/Home";
 import AdminPanel from "./pages/AdminPanel";
+import SubmitProofPage from "./pages/SubmitProofPage";
 import Footer from "./components/layout/Footer";
 import AdminLoginModal from "./components/modals/AdminLoginModal";
 
-
 import { ToastProvider } from "./context/ToastContext";
-
 import ErrorBoundary from "./components/utils/ErrorBoundary";
 
 function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [proofCountry, setProofCountry] = useState(null); // non-null = show SubmitProofPage
+
+  const handleNavigateToProof = (country) => {
+    setProofCountry(country);
+  };
+
+  const handleBackFromProof = () => {
+    setProofCountry(null);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -37,13 +45,22 @@ function App() {
 
   const content = (
     <>
-      <Home />
-      <Footer />
-      
+      {proofCountry !== null ? (
+        <SubmitProofPage
+          country={proofCountry}
+          onBack={handleBackFromProof}
+        />
+      ) : (
+        <>
+          <Home onNavigateToProof={handleNavigateToProof} />
+          <Footer />
+        </>
+      )}
+
       {showLoginModal && (
-        <AdminLoginModal 
-          isOpen={showLoginModal} 
-          onClose={() => setShowLoginModal(false)} 
+        <AdminLoginModal
+          isOpen={showLoginModal}
+          onClose={() => setShowLoginModal(false)}
           onLoginSuccess={handleLoginSuccess}
         />
       )}

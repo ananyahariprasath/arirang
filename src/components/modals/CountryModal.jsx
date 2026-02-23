@@ -3,7 +3,7 @@ import useRegionalData from "../../hooks/useRegionalData";
 import { COUNTRY_PRESETS, COUNTRY_REGION_MAP, COUNTRY_TZ_MAP, FOCUS_PLAYLISTS, GLOBAL_DEFAULT, COUNTRY_MULTI_TZ_MAP } from "../../constants";
 import { formatResetTime, convertKSTToLocal, convertSpotifyReset } from "../../utils/time";
 
-function CountryModal({ selectedCountry, onClose }) {
+function CountryModal({ selectedCountry, onClose, onSubmitProof }) {
   const [activePlatform, setActivePlatform] = useState("spotify");
   const { regions } = useRegionalData();
 
@@ -145,14 +145,12 @@ function CountryModal({ selectedCountry, onClose }) {
               * Please use the 20 focus playlists above to stream and support.
             </p>
           </div>
-          <a
-            href={data.gFormUrl || "https://google.com/forms/example"} 
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => onSubmitProof?.(selectedCountry)}
             className="w-full sm:w-fit px-8 py-4 rounded-2xl bg-[var(--accent)] text-black dark:text-black font-black uppercase text-xs tracking-[0.1em] hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[var(--accent)]/20 text-center"
           >
             Submit Proof 💜
-          </a>
+          </button>
         </div>
 
       </div>

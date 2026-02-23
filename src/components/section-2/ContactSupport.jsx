@@ -1,8 +1,9 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useToast } from "../../context/ToastContext";
 
 function ContactSupport({ isInsideDrawer = false }) {
   const toast = useToast();
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     socialMedia: "",
     id: "",
@@ -18,47 +19,43 @@ function ContactSupport({ isInsideDrawer = false }) {
     "TikTok",
   ];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate form
+
     if (!formData.socialMedia || !formData.id || !formData.query) {
       toast.show("Please fill in all fields", "error");
       return;
     }
 
-    // Create new ticket object
-    const newTicket = {
-      id: Date.now(), // Simple unique ID
-      socialMedia: formData.socialMedia,
-      userId: formData.id,
-      query: formData.query,
-      status: "Open",
-      timestamp: new Date().toLocaleString(),
-    };
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/support-tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          socialMedia: formData.socialMedia,
+          userId: formData.id,
+          query: formData.query,
+        }),
+      });
 
-    // Get existing tickets from localStorage
-    const existingTickets = JSON.parse(localStorage.getItem("supportTickets") || "[]");
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to submit support request");
+      }
 
-    // Add new ticket
-    const updatedTickets = [newTicket, ...existingTickets];
-
-    // Save back to localStorage
-    localStorage.setItem("supportTickets", JSON.stringify(updatedTickets));
-
-    toast.show("Support request submitted! 💜", "success");
-    
-    // Reset form
-    setFormData({
-      socialMedia: "",
-      id: "",
-      query: "",
-    });
+      toast.show("Support request submitted!", "success");
+      setFormData({ socialMedia: "", id: "", query: "" });
+    } catch (error) {
+      toast.show(error.message || "Failed to submit support request", "error");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
@@ -66,20 +63,16 @@ function ContactSupport({ isInsideDrawer = false }) {
 
   return (
     <div className={isInsideDrawer ? "" : "sticky top-28"}>
-
-      <div className="bg-[var(--card-bg)]/40
+      <div
+        className="bg-[var(--card-bg)]/40
                       backdrop-blur-xl
                       border border-[var(--accent)]/40
                       rounded-3xl
-                      p-5 shadow-2xl">
-
-        <h3 className="text-lg font-bold mb-4 text-center">
-          Contact Support
-        </h3>
+                      p-5 shadow-2xl"
+      >
+        <h3 className="text-lg font-bold mb-4 text-center">Contact Support</h3>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-sm">
-
-          {/* Social Media Dropdown */}
           <select
             name="socialMedia"
             value={formData.socialMedia}
@@ -90,7 +83,9 @@ function ContactSupport({ isInsideDrawer = false }) {
                        focus:outline-none focus:border-[var(--accent)] focus:bg-[var(--card-bg)]/30
                        transition-all duration-300 cursor-pointer"
           >
-            <option value="" disabled className="bg-[var(--card-bg)] text-[var(--text-primary)]">Select Social Media Platform</option>
+            <option value="" disabled className="bg-[var(--card-bg)] text-[var(--text-primary)]">
+              Select Social Media Platform
+            </option>
             {socialMediaOptions.map((platform) => (
               <option key={platform} value={platform} className="bg-[var(--card-bg)] text-[var(--text-primary)]">
                 {platform}
@@ -98,7 +93,6 @@ function ContactSupport({ isInsideDrawer = false }) {
             ))}
           </select>
 
-          {/* ID Input */}
           <input
             type="text"
             name="id"
@@ -112,7 +106,6 @@ function ContactSupport({ isInsideDrawer = false }) {
                        transition-all duration-300"
           />
 
-          {/* Query Textarea */}
           <textarea
             name="query"
             value={formData.query}
@@ -126,27 +119,23 @@ function ContactSupport({ isInsideDrawer = false }) {
                        transition-all duration-300 resize-none"
           ></textarea>
 
-          {/* Submit Button */}
-          <button 
+          <button
             type="submit"
+            disabled={submitting}
             className="w-full py-3 rounded-xl border-2 border-[var(--text-primary)] 
                        hover:bg-[var(--accent)] hover:text-black hover:border-[var(--accent)]
-                       font-semibold transition-all duration-300"
+                       font-semibold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            SUBMIT
+            {submitting ? "SUBMITTING..." : "SUBMIT"}
           </button>
 
           <p className="text-[10px] italic text-center opacity-60 leading-relaxed mt-2">
             *If you are not able to reach us through this form, you can contact us directly through our socials given in the Help Desk.
           </p>
-
         </form>
-
       </div>
-
     </div>
   );
 }
 
 export default ContactSupport;
-

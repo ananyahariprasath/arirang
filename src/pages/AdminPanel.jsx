@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Header from "../components/layout/Header";
 import useBattles from "../hooks/useBattles";
 import useTimeline from "../hooks/useTimeline";
@@ -8,10 +8,162 @@ import useGalleryData from "../hooks/useGalleryData";
 import { useToast } from "../context/ToastContext";
 import { COUNTRY_PRESETS, COUNTRY_REGION_MAP, COUNTRIES, COUNTRY_TZ_MAP, FOCUS_PLAYLISTS } from "../constants";
 
+const allRegions = [...new Set(Object.values(COUNTRY_REGION_MAP))];
+
+function AdminViewPanel() {
+  const [submissions, setSubmissions] = useState([]);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(true);
+  const [submissionsError, setSubmissionsError] = useState("");
+  const [filters, setFilters] = useState({
+    country: "",
+    region: "",
+    minAlbumStreams: "",
+    maxAlbumStreams: "",
+    minTitleStreams: "",
+    maxTitleStreams: "",
+  });
+
+  useEffect(() => {
+    let active = true;
+
+    const loadSubmissions = async () => {
+      setLoadingSubmissions(true);
+      setSubmissionsError("");
+      try {
+        const response = await fetch("/api/proof-submissions");
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to fetch proof submissions");
+        }
+        if (active) setSubmissions(Array.isArray(data.submissions) ? data.submissions : []);
+      } catch (error) {
+        if (active) setSubmissionsError(error.message || "Failed to fetch proof submissions");
+      } finally {
+        if (active) setLoadingSubmissions(false);
+      }
+    };
+
+    loadSubmissions();
+    const intervalId = setInterval(loadSubmissions, 30000);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  const handleFilterChange = (e) => {
+    setFilters({
+      ...filters,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  const filteredSubmissions = useMemo(() => {
+    return submissions.filter((s) => {
+      const { country, region, minAlbumStreams, maxAlbumStreams, minTitleStreams, maxTitleStreams } = filters;
+      if (country && s.country !== country) return false;
+      if (region && s.region !== region) return false;
+      if (minAlbumStreams && s.albumStreamCount < parseInt(minAlbumStreams)) return false;
+      if (maxAlbumStreams && s.albumStreamCount > parseInt(maxAlbumStreams)) return false;
+      if (minTitleStreams && s.titleTrackStreamCount < parseInt(minTitleStreams)) return false;
+      if (maxTitleStreams && s.titleTrackStreamCount > parseInt(maxTitleStreams)) return false;
+      return true;
+    }).sort((a, b) => new Date(b.submissionTime) - new Date(a.submissionTime));
+  }, [submissions, filters]);
+
+  return (
+    <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <h2 className="text-2xl font-bold mb-8">Proof Submissions ({filteredSubmissions.length})</h2>
+
+      {/* Filters */}
+      <div className="bg-[var(--card-bg)]/60 backdrop-blur-xl p-6 rounded-3xl border border-[var(--accent)]/20 mb-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Country Filter */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] uppercase font-black tracking-widest opacity-60">Country</label>
+          <select name="country" value={filters.country} onChange={handleFilterChange} className="w-full bg-[var(--bg-secondary)]/50 border rounded-2xl px-4 py-3 text-sm font-semibold outline-none border-[var(--accent)]/20 focus:border-[var(--accent)]">
+            <option value="">All Countries</option>
+            {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        {/* Region Filter */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] uppercase font-black tracking-widest opacity-60">Region</label>
+          <select name="region" value={filters.region} onChange={handleFilterChange} className="w-full bg-[var(--bg-secondary)]/50 border rounded-2xl px-4 py-3 text-sm font-semibold outline-none border-[var(--accent)]/20 focus:border-[var(--accent)]">
+            <option value="">All Regions</option>
+            {allRegions.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        {/* Album Stream Filter */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] uppercase font-black tracking-widest opacity-60">Album Streams</label>
+          <div className="flex items-center gap-2">
+            <input type="number" name="minAlbumStreams" placeholder="Min" value={filters.minAlbumStreams} onChange={handleFilterChange} className="w-full bg-[var(--bg-secondary)]/50 border rounded-2xl px-4 py-3 text-sm font-semibold outline-none border-[var(--accent)]/20 focus:border-[var(--accent)]" />
+            <input type="number" name="maxAlbumStreams" placeholder="Max" value={filters.maxAlbumStreams} onChange={handleFilterChange} className="w-full bg-[var(--bg-secondary)]/50 border rounded-2xl px-4 py-3 text-sm font-semibold outline-none border-[var(--accent)]/20 focus:border-[var(--accent)]" />
+          </div>
+        </div>
+        {/* Title Track Stream Filter */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] uppercase font-black tracking-widest opacity-60">Title Track Streams</label>
+          <div className="flex items-center gap-2">
+            <input type="number" name="minTitleStreams" placeholder="Min" value={filters.minTitleStreams} onChange={handleFilterChange} className="w-full bg-[var(--bg-secondary)]/50 border rounded-2xl px-4 py-3 text-sm font-semibold outline-none border-[var(--accent)]/20 focus:border-[var(--accent)]" />
+            <input type="number" name="maxTitleStreams" placeholder="Max" value={filters.maxTitleStreams} onChange={handleFilterChange} className="w-full bg-[var(--bg-secondary)]/50 border rounded-2xl px-4 py-3 text-sm font-semibold outline-none border-[var(--accent)]/20 focus:border-[var(--accent)]" />
+          </div>
+        </div>
+      </div>
+
+      {/* Submissions Table */}
+      {loadingSubmissions && (
+        <div className="mb-6 text-sm font-bold text-[var(--text-secondary)]">Loading submissions...</div>
+      )}
+      {submissionsError && (
+        <div className="mb-6 text-sm font-bold text-red-400">{submissionsError}</div>
+      )}
+      <div className="bg-[var(--card-bg)]/40 backdrop-blur-xl border border-[var(--accent)]/40 rounded-3xl overflow-hidden shadow-2xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left min-w-[1200px]">
+            <thead className="bg-[var(--accent)]/5 border-b border-[var(--accent)]/20">
+              <tr>
+                <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Time</th>
+                <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Username</th>
+                <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Platform</th>
+                <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Country</th>
+                <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Region</th>
+                <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Album Streams</th>
+                <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Title Streams</th>
+                <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Screenshot</th>
+                <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Notes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--accent)]/10">
+              {filteredSubmissions.map((s) => (
+                <tr key={s.id} className="hover:bg-[var(--accent)]/5 transition-colors">
+                  <td className="p-4 text-xs">{new Date(s.submissionTime).toLocaleString()}</td>
+                  <td className="p-4 text-sm font-bold">{s.username}</td>
+                  <td className="p-4 text-sm">{s.platform}</td>
+                  <td className="p-4 text-sm">{s.country}</td>
+                  <td className="p-4 text-sm">{s.region}</td>
+                  <td className="p-4 text-sm font-bold text-[var(--accent)]">{s.albumStreamCount}</td>
+                  <td className="p-4 text-sm font-bold text-[var(--accent)]">{s.titleTrackStreamCount}</td>
+                  <td className="p-4 text-sm">
+                    <a href={s.screenshotUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Link</a>
+                  </td>
+                  <td className="p-4 text-sm max-w-xs truncate">{s.notes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function AdminPanel() {
   const [activeTab, setActiveTab] = useState("tickets");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [tickets, setTickets] = useState([]);
+  const [ticketsLoading, setTicketsLoading] = useState(true);
+  const [ticketsError, setTicketsError] = useState("");
   const { battles, liveBattles, addBattle, updateBattle, updateLiveBattles, deleteBattle, clearBattles, resetLiveBattles, loading: battlesLoading } = useBattles();
   const { events, addEvent, updateEvent, deleteEvent, clearTimeline, resetToDefault, loading: timelineLoading } = useTimeline();
   const { regions, addRegion, deleteRegion, resetRegions, loading: regionsLoading } = useRegionalData();
@@ -73,23 +225,62 @@ function AdminPanel() {
   }, [JSON.stringify(liveBattles)]);
 
   useEffect(() => {
-    // Load tickets from localStorage
-    const savedTickets = JSON.parse(localStorage.getItem("supportTickets") || "[]");
-    setTickets(savedTickets);
+    let active = true;
+
+    const loadTickets = async () => {
+      setTicketsLoading(true);
+      setTicketsError("");
+      try {
+        const response = await fetch("/api/support-tickets");
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load support tickets");
+        }
+        if (active) setTickets(Array.isArray(data.tickets) ? data.tickets : []);
+      } catch (error) {
+        if (active) setTicketsError(error.message || "Failed to load support tickets");
+      } finally {
+        if (active) setTicketsLoading(false);
+      }
+    };
+
+    loadTickets();
+    const intervalId = setInterval(loadTickets, 20000);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
   }, []);
 
-  const handleClearAllTickets = () => {
+  const handleClearAllTickets = async () => {
     if (confirm("Are you sure you want to clear all tickets? This cannot be undone.")) {
-      localStorage.removeItem("supportTickets");
-      setTickets([]);
+      try {
+        const response = await fetch("/api/support-tickets?clearAll=1", { method: "DELETE" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to clear tickets");
+        }
+        setTickets([]);
+        toast.show("All support tickets cleared", "success");
+      } catch (error) {
+        toast.show(error.message || "Failed to clear tickets", "error");
+      }
     }
   };
 
-  const handleDeleteTicket = (id) => {
+  const handleDeleteTicket = async (id) => {
     if (confirm("Delete this ticket?")) {
-      const updatedTickets = tickets.filter(t => t.id !== id);
-      setTickets(updatedTickets);
-      localStorage.setItem("supportTickets", JSON.stringify(updatedTickets));
+      try {
+        const response = await fetch(`/api/support-tickets?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to delete ticket");
+        }
+        setTickets((prev) => prev.filter((ticket) => ticket.id !== id));
+        toast.show("Ticket deleted", "success");
+      } catch (error) {
+        toast.show(error.message || "Failed to delete ticket", "error");
+      }
     }
   };
 
@@ -244,6 +435,7 @@ function AdminPanel() {
                 
                 <div className="absolute top-full right-0 md:left-0 md:right-auto mt-3 w-56 bg-[var(--bg-primary)]/90 backdrop-blur-3xl border border-[var(--accent)]/40 p-2 rounded-2xl shadow-2xl z-50 flex flex-col gap-1 animate-in slide-in-from-top-2 fade-in duration-200">
                   <MenuButton tab="tickets" label="Support Tickets" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
+                  <MenuButton tab="proofSubmissions" label="Proof Submissions" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="battles" label="Battle Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="timeline" label="Timeline Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="regions" label="Region Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
@@ -269,6 +461,13 @@ function AdminPanel() {
                 </button>
               )}
             </div>
+
+            {ticketsLoading && (
+              <div className="mb-6 text-sm font-bold text-[var(--text-secondary)]">Loading support tickets...</div>
+            )}
+            {ticketsError && (
+              <div className="mb-6 text-sm font-bold text-red-400">{ticketsError}</div>
+            )}
 
             {tickets.length === 0 ? (
               <div className="text-center py-24 opacity-40 border-2 border-dashed border-[var(--accent)]/10 rounded-3xl">
@@ -314,6 +513,10 @@ function AdminPanel() {
               </div>
             )}
           </section>
+        )}
+
+        {activeTab === "proofSubmissions" && (
+          <AdminViewPanel />
         )}
 
         {activeTab === "battles" && (

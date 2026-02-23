@@ -20,7 +20,7 @@ import PreSaveQR from "../components/section-1/PreSaveQR";
 import CountdownTimer from "../components/section-1/CountdownTimer";
 
 
-function Home() {
+function Home({ onNavigateToProof }) {
   const [selectedCountry, setSelectedCountry] = useState("Select your Country");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRecentBattlesOpen, setIsRecentBattlesOpen] = useState(false);
@@ -177,6 +177,10 @@ function Home() {
         <CountryModal
           selectedCountry={selectedCountry}
           onClose={handleCloseModal}
+          onSubmitProof={(country) => {
+            handleCloseModal();
+            onNavigateToProof?.(country);
+          }}
         />
       )}
 
