@@ -30,8 +30,8 @@ function AdminLoginModal({ isOpen, onClose, onLoginSuccess }) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm text-[var(--text-primary)]">
-      <div className="bg-[var(--card-bg)] border border-[var(--accent)]/50 p-8 rounded-2xl shadow-2xl w-full max-w-sm animate-in fade-in zoom-in duration-300">
-        <h2 className="text-2xl font-bold mb-6 text-center text-[var(--accent)]">Admin Access</h2>
+      <div className="bg-[var(--card-bg)] border border-[var(--accent)]/50 p-4 sm:p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-sm sm:max-w-md animate-in fade-in zoom-in duration-300">
+        <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 text-center text-[var(--accent)]">Admin Access</h2>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -49,17 +49,17 @@ function AdminLoginModal({ isOpen, onClose, onLoginSuccess }) {
             {error && <p className="text-red-400 text-sm mt-2 ml-1">{error}</p>}
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 rounded-xl border border-[var(--accent)]/30 hover:bg-[var(--accent)]/10 transition-colors text-[var(--text-primary)]"
+              className="flex-1 px-4 py-2 sm:py-3 rounded-xl border border-[var(--accent)]/30 hover:bg-[var(--accent)]/10 transition-colors text-[var(--text-primary)] text-sm sm:text-base"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/80 transition-colors font-semibold shadow-lg shadow-[var(--accent)]/20"
+              className="flex-1 px-4 py-2 sm:py-3 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/80 transition-colors font-semibold shadow-lg shadow-[var(--accent)]/20 text-sm sm:text-base"
             >
               Login
             </button>

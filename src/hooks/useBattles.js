@@ -10,13 +10,15 @@ const INITIAL_LIVE_BATTLES = [
   { id: "lb4", title: "EUROPE vs AFRICA", goal: "320M", progress: 0, platform: "Spotify", status: "Yet to Start" },
 ];
 
-export default function useBattles() {
+export default function useBattles(options = {}) {
+  const { refreshToken = 0 } = options;
   const [battles, setBattles] = useState([]);
   const [liveBattles, setLiveBattles] = useState(INITIAL_LIVE_BATTLES);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
+      setLoading(true);
       try {
         if (DATA_SOURCE_URL) {
           const response = await fetch(`${DATA_SOURCE_URL}?t=${Date.now()}`, { cache: "no-store" });
@@ -48,7 +50,7 @@ export default function useBattles() {
     };
 
     loadData();
-  }, []);
+  }, [refreshToken]);
 
   const addBattle = (newBattle) => {
     const updated = [newBattle, ...battles];

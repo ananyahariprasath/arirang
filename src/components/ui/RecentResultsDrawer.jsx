@@ -7,10 +7,10 @@ function RecentResultsDrawer({ onClose }) {
     <>
       {/* Drawer Content */}
       <div className="w-[100vw] max-w-[360px] sm:w-[440px] h-full bg-[var(--bg-primary)] border-r border-[var(--accent)]/20 shadow-[20px_0_50px_rgba(0,0,0,0.3)] overflow-y-auto p-6 sm:p-8 flex flex-col pt-24 lg:pt-28">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-6 sm:mb-8">
           <div>
-            <h2 className="text-xl font-black text-[var(--accent)] tracking-tight">Recent Results</h2>
-            <p className="text-xs opacity-50 mt-0.5">Latest completed battles</p>
+            <h2 className="text-lg sm:text-xl font-black text-[var(--accent)] tracking-tight">Recent Results</h2>
+            <p className="text-[10px] sm:text-xs opacity-50 mt-0.5">Latest completed battles</p>
           </div>
           <button
             onClick={onClose}
@@ -29,9 +29,9 @@ function RecentResultsDrawer({ onClose }) {
             battles.map((battle, index) => (
               <div
                 key={battle.id}
-                className="flex items-center justify-between p-3 rounded-xl bg-[var(--accent)]/5 border border-[var(--accent)]/5 hover:border-[var(--accent)]/20 transition-all"
+                className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 rounded-xl bg-[var(--accent)]/5 border border-[var(--accent)]/5 hover:border-[var(--accent)]/20 transition-all gap-2 sm:gap-0"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
                   <div className="w-8 h-8 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center font-bold text-[var(--accent)] text-xs shrink-0">
                     #{index + 1}
                   </div>
@@ -49,7 +49,7 @@ function RecentResultsDrawer({ onClose }) {
                     )}
                   </div>
                 </div>
-                <div className="text-right flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 ml-11 sm:ml-0">
                   <div className="text-right">
                     <div className="text-[10px] font-black text-[var(--accent)] leading-none">{battle.progress}%</div>
                     <div className={`text-[7px] font-black uppercase tracking-widest mt-0.5 ${battle.reachedTarget ? 'text-emerald-400' : 'text-red-500'}`}>

@@ -3,7 +3,7 @@ import { getDb } from "../lib/mongodb.js";
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
@@ -88,6 +88,41 @@ export default async function handler(req, res) {
           id: result.insertedId.toString(),
           ...submission,
         },
+      });
+    }
+
+    if (req.method === "DELETE") {
+      const { startDate, endDate } = req.query || {};
+      const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required in YYYY-MM-DD format" });
+      }
+
+      if (!datePattern.test(String(startDate)) || !datePattern.test(String(endDate))) {
+        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+      }
+
+      const rangeStart = new Date(`${startDate}T00:00:00.000Z`);
+      const rangeEnd = new Date(`${endDate}T23:59:59.999Z`);
+
+      if (Number.isNaN(rangeStart.getTime()) || Number.isNaN(rangeEnd.getTime())) {
+        return res.status(400).json({ error: "Invalid date range" });
+      }
+      if (rangeStart > rangeEnd) {
+        return res.status(400).json({ error: "startDate cannot be after endDate" });
+      }
+
+      const result = await submissionsCollection.deleteMany({
+        $or: [
+          { createdAt: { $gte: rangeStart, $lte: rangeEnd } },
+          { submissionTime: { $gte: rangeStart.toISOString(), $lte: rangeEnd.toISOString() } },
+        ],
+      });
+
+      return res.status(200).json({
+        success: true,
+        deletedCount: result.deletedCount || 0,
       });
     }
 

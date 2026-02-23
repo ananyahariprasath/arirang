@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useBattles from "../../hooks/useBattles";
 
 const STATUS_COLORS = {
@@ -30,7 +30,7 @@ function BattleDetailsModal({ battle, onClose }) {
   return (
     <div className="fixed inset-0 z-[120] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="w-full max-w-xl rounded-3xl p-5 shadow-2xl border border-white/50 dark:border-[var(--accent)]/40 bg-white/35 dark:bg-[var(--card-bg)]/70 backdrop-blur-2xl"
+        className="w-full max-w-xl rounded-3xl p-5 shadow-2xl border border-[var(--accent)]/30 dark:border-[var(--accent)]/40 bg-white dark:bg-[var(--card-bg)]/90"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-start gap-3 mb-4">
@@ -65,7 +65,7 @@ function BattleDetailsModal({ battle, onClose }) {
 
           <div className="space-y-2">
             <div className="flex justify-between items-center gap-2">
-              <p className="text-xs font-black uppercase tracking-wide text-[var(--text-primary)]">Title Track Goal: {battle.titleTrackGoal ?? battle.goal}</p>
+              <p className="text-xs font-black uppercase tracking-wide text-[var(--text-primary)]">Title Goal: {battle.titleTrackGoal ?? battle.goal}</p>
               <span className={`text-[10px] font-black uppercase tracking-wider border rounded-full px-2 py-0.5 ${titleStatusClass}`}>
                 {titleStatus}
               </span>
@@ -122,9 +122,15 @@ function LiveBattleCard({ battle, onView }) {
   );
 }
 
-function StreamingBattle() {
-  const { liveBattles } = useBattles({ syncLiveBattles: true });
+function StreamingBattle({ refreshToken = 0, onRefreshStateChange = null }) {
+  const { liveBattles, loading } = useBattles({ refreshToken });
   const [selectedBattle, setSelectedBattle] = useState(null);
+
+  useEffect(() => {
+    if (onRefreshStateChange) {
+      onRefreshStateChange(loading);
+    }
+  }, [loading, onRefreshStateChange]);
 
   return (
     <>
@@ -135,6 +141,10 @@ function StreamingBattle() {
           </div>
         ))}
       </div>
+
+      <p className="text-[8px] sm:text-[9px] text-center opacity-40 font-medium italic">
+        * Battle results will be updated every hour
+      </p>
 
       {selectedBattle && (
         <BattleDetailsModal battle={selectedBattle} onClose={() => setSelectedBattle(null)} />

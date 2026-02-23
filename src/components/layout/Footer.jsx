@@ -20,18 +20,18 @@ function Footer() {
 
       {/* Footer Content */}
       <div 
-        className={`backdrop-blur-xl border-t border-[var(--accent)]/40 py-4 text-center text-sm
+        className={`backdrop-blur-xl border-t border-[var(--accent)]/40 py-3 sm:py-4 text-center text-xs sm:text-sm
                     ${theme === "light" 
                       ? "bg-white/80 text-gray-900" 
                       : "bg-[var(--card-bg)]/80 text-white"
                     }`}
       >
 
-        <p className="opacity-70 uppercase tracking-[0.2em] font-bold">
+        <p className="opacity-70 uppercase tracking-[0.2em] font-bold text-[10px] sm:text-xs">
           © 2026 ARIRARIRANG. All rights reserved.
         </p>
 
-        <p className="mt-1 text-xs opacity-50">
+        <p className="mt-1 text-[9px] sm:text-xs opacity-50">
           Designed with 💜 for the BTS ARMY by ARMY. This is a fan project and is not a part of HYBE or BTS.
         </p>
 

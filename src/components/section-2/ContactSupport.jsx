@@ -68,9 +68,9 @@ function ContactSupport({ isInsideDrawer = false }) {
                       backdrop-blur-xl
                       border border-[var(--accent)]/40
                       rounded-3xl
-                      p-5 shadow-2xl"
+                      p-4 sm:p-5 md:p-6 shadow-2xl"
       >
-        <h3 className="text-lg font-bold mb-4 text-center">Contact Support</h3>
+        <h3 className="text-base sm:text-lg font-bold mb-4 text-center">Contact Support</h3>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-sm">
           <select

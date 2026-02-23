@@ -14,9 +14,13 @@ function AdminViewPanel() {
   const [submissions, setSubmissions] = useState([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(true);
   const [submissionsError, setSubmissionsError] = useState("");
+  const [clearDateRange, setClearDateRange] = useState({ startDate: "", endDate: "" });
+  const [clearingDateRange, setClearingDateRange] = useState(false);
+  const toast = useToast();
   const [filters, setFilters] = useState({
     country: "",
     region: "",
+    date: "",
     minAlbumStreams: "",
     maxAlbumStreams: "",
     minTitleStreams: "",
@@ -58,11 +62,69 @@ function AdminViewPanel() {
     });
   };
 
+  const handleDateRangeChange = (e) => {
+    setClearDateRange((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  const handleClearDateRange = async () => {
+    const { startDate, endDate } = clearDateRange;
+    if (!startDate || !endDate) {
+      toast.show("Select both start and end date", "error");
+      return;
+    }
+
+    const start = new Date(`${startDate}T00:00:00.000Z`);
+    const end = new Date(`${endDate}T23:59:59.999Z`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      toast.show("Invalid date range", "error");
+      return;
+    }
+    if (start > end) {
+      toast.show("Start date cannot be after end date", "error");
+      return;
+    }
+
+    if (!confirm(`Clear proof submissions between ${startDate} and ${endDate}? This cannot be undone.`)) {
+      return;
+    }
+
+    setClearingDateRange(true);
+    try {
+      const params = new URLSearchParams({ startDate, endDate });
+      const response = await fetch(`/api/proof-submissions?${params.toString()}`, { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to clear submissions");
+      }
+
+      setSubmissions((prev) =>
+        prev.filter((entry) => {
+          const time = new Date(entry.submissionTime).getTime();
+          if (Number.isNaN(time)) return true;
+          return time < start.getTime() || time > end.getTime();
+        })
+      );
+
+      toast.show(`Removed ${data.deletedCount || 0} submission(s)`, "success");
+    } catch (error) {
+      toast.show(error.message || "Failed to clear submissions", "error");
+    } finally {
+      setClearingDateRange(false);
+    }
+  };
+
   const filteredSubmissions = useMemo(() => {
     return submissions.filter((s) => {
-      const { country, region, minAlbumStreams, maxAlbumStreams, minTitleStreams, maxTitleStreams } = filters;
+      const { country, region, date, minAlbumStreams, maxAlbumStreams, minTitleStreams, maxTitleStreams } = filters;
+      const submissionDate = s?.submissionTime
+        ? new Date(s.submissionTime).toLocaleDateString("en-CA")
+        : "";
       if (country && s.country !== country) return false;
       if (region && s.region !== region) return false;
+      if (date && submissionDate !== date) return false;
       if (minAlbumStreams && s.albumStreamCount < parseInt(minAlbumStreams)) return false;
       if (maxAlbumStreams && s.albumStreamCount > parseInt(maxAlbumStreams)) return false;
       if (minTitleStreams && s.titleTrackStreamCount < parseInt(minTitleStreams)) return false;
@@ -94,7 +156,7 @@ function AdminViewPanel() {
       </div>
 
       {/* Filters */}
-      <div className="bg-[var(--card-bg)]/60 backdrop-blur-xl p-6 rounded-3xl border border-[var(--accent)]/20 mb-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="bg-[var(--card-bg)]/60 backdrop-blur-xl p-6 rounded-3xl border border-[var(--accent)]/20 mb-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Country Filter */}
         <div className="flex flex-col gap-1.5">
           <label className="text-[10px] uppercase font-black tracking-widest opacity-60">Country</label>
@@ -110,6 +172,11 @@ function AdminViewPanel() {
             <option value="">All Regions</option>
             {allRegions.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
+        </div>
+        {/* Date Filter */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] uppercase font-black tracking-widest opacity-60">Date</label>
+          <input type="date" name="date" value={filters.date} onChange={handleFilterChange} className="w-full bg-[var(--bg-secondary)]/50 border rounded-2xl px-4 py-3 text-sm font-semibold outline-none border-[var(--accent)]/20 focus:border-[var(--accent)]" />
         </div>
         {/* Album Stream Filter */}
         <div className="flex flex-col gap-1.5">
@@ -129,6 +196,38 @@ function AdminViewPanel() {
         </div>
       </div>
 
+      <div className="bg-[var(--card-bg)]/60 backdrop-blur-xl p-5 rounded-3xl border border-red-400/30 mb-8">
+        <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+          <div className="flex-1">
+            <label className="text-[10px] uppercase font-black tracking-widest opacity-60 block mb-1.5">Clear From</label>
+            <input
+              type="date"
+              name="startDate"
+              value={clearDateRange.startDate}
+              onChange={handleDateRangeChange}
+              className="w-full bg-[var(--bg-secondary)]/50 border rounded-2xl px-4 py-3 text-sm font-semibold outline-none border-[var(--accent)]/20 focus:border-[var(--accent)]"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="text-[10px] uppercase font-black tracking-widest opacity-60 block mb-1.5">Clear To</label>
+            <input
+              type="date"
+              name="endDate"
+              value={clearDateRange.endDate}
+              onChange={handleDateRangeChange}
+              className="w-full bg-[var(--bg-secondary)]/50 border rounded-2xl px-4 py-3 text-sm font-semibold outline-none border-[var(--accent)]/20 focus:border-[var(--accent)]"
+            />
+          </div>
+          <button
+            onClick={handleClearDateRange}
+            disabled={clearingDateRange}
+            className="h-[46px] px-5 rounded-2xl bg-red-500 text-white text-xs font-black uppercase tracking-widest hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+          >
+            {clearingDateRange ? "Clearing..." : "Clear Data in Range"}
+          </button>
+        </div>
+      </div>
+
       {/* Submissions Table */}
       {loadingSubmissions && (
         <div className="mb-6 text-sm font-bold text-[var(--text-secondary)]">Loading submissions...</div>
@@ -141,6 +240,7 @@ function AdminViewPanel() {
           <table className="w-full text-left min-w-[1200px]">
             <thead className="bg-[var(--accent)]/5 border-b border-[var(--accent)]/20">
               <tr>
+                <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Date</th>
                 <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Time</th>
                 <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Username</th>
                 <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Platform</th>
@@ -155,7 +255,8 @@ function AdminViewPanel() {
             <tbody className="divide-y divide-[var(--accent)]/10">
               {filteredSubmissions.map((s) => (
                 <tr key={s.id} className="hover:bg-[var(--accent)]/5 transition-colors">
-                  <td className="p-4 text-xs">{new Date(s.submissionTime).toLocaleString()}</td>
+                  <td className="p-4 text-xs">{new Date(s.submissionTime).toLocaleDateString()}</td>
+                  <td className="p-4 text-xs">{new Date(s.submissionTime).toLocaleTimeString()}</td>
                   <td className="p-4 text-sm font-bold">{s.username}</td>
                   <td className="p-4 text-sm">{s.platform}</td>
                   <td className="p-4 text-sm">{s.country}</td>
@@ -729,6 +830,50 @@ function AdminPanel() {
                             onChange={(e) => {
                               const updated = [...liveEdits];
                               updated[i] = { ...updated[i], status: e.target.value };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all appearance-none text-[var(--text-primary)]"
+                          >
+                            {["Yet to Start", "Surging", "On Track", "Heating Up", "Almost There"].map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Title Goal</label>
+                          <input
+                            type="text"
+                            value={lb.titleTrackGoal ?? lb.goal ?? ""}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], titleTrackGoal: e.target.value };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Title Progress %</label>
+                          <input
+                            type="number" min="0" max="100"
+                            value={lb.titleTrackProgress ?? lb.progress ?? 0}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], titleTrackProgress: parseInt(e.target.value) || 0 };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Title Status</label>
+                          <select
+                            value={lb.titleTrackStatus ?? lb.status ?? "Yet to Start"}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], titleTrackStatus: e.target.value };
                               setLiveEdits(updated);
                             }}
                             className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all appearance-none text-[var(--text-primary)]"

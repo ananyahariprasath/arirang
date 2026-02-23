@@ -1,10 +1,50 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
+
+const CONFETTI_COLORS = ["#C8A2FF", "#7B4AE2", "#22C55E", "#F43F5E", "#F59E0B", "#06B6D4", "#00FFFF"];
+
+function createConfettiPieces(count = 36) {
+  return Array.from({ length: count }).map((_, idx) => ({
+    id: `confetti_${idx}`,
+    left: Math.random() * 100,
+    delay: Math.random() * 0.6,
+    duration: 2.8 + Math.random() * 1.9,
+    drift: (Math.random() - 0.5) * 120,
+    size: 5 + Math.random() * 5,
+    rotation: Math.random() * 360,
+    color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+  }));
+}
 
 export default function BattleWinnerModal({ winners, onClose }) {
   const hasHistory = winners && winners.length > 0;
+  const prefersReducedMotion = useMemo(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }, []);
+
+  const confettiCount = useMemo(() => {
+    if (prefersReducedMotion) return 0;
+    const isMobile = typeof window !== "undefined" && window.matchMedia?.("(max-width: 768px)").matches;
+    const lowPowerDevice =
+      typeof navigator !== "undefined" &&
+      Number.isFinite(navigator.hardwareConcurrency) &&
+      navigator.hardwareConcurrency <= 4;
+
+    if (lowPowerDevice) return isMobile ? 12 : 18;
+    return isMobile ? 20 : 36;
+  }, [prefersReducedMotion]);
+
+  const [showConfetti, setShowConfetti] = useState(confettiCount > 0);
+  const confettiPieces = useMemo(() => createConfettiPieces(confettiCount), [confettiCount]);
   
   // Limit to 4 to ensure the grid stays balanced
   const displayWinners = hasHistory ? winners.slice(0, 4) : [];
+
+  useEffect(() => {
+    if (!showConfetti) return undefined;
+    const timer = setTimeout(() => setShowConfetti(false), 5600);
+    return () => clearTimeout(timer);
+  }, [showConfetti]);
 
   return (
     <div className="fixed inset-0 z-[150] flex items-center justify-center px-4 animate-fadeIn overflow-hidden">
@@ -14,9 +54,31 @@ export default function BattleWinnerModal({ winners, onClose }) {
         className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-md transition-opacity duration-300"
       />
 
+      {/* Confetti burst */}
+      {showConfetti && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-[151]">
+          {confettiPieces.map((piece) => (
+            <span
+              key={piece.id}
+              className="absolute top-[-8vh] confetti-piece"
+              style={{
+                left: `${piece.left}%`,
+                width: `${piece.size}px`,
+                height: `${piece.size * 0.48}px`,
+                backgroundColor: piece.color,
+                transform: `rotate(${piece.rotation}deg)`,
+                animationDelay: `${piece.delay}s`,
+                animationDuration: `${piece.duration}s`,
+                "--confetti-drift": `${piece.drift}px`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+
       {/* Modal content */}
       <div
-        className="relative bg-[var(--bg-primary)] border border-[var(--accent)]/30 dark:border-[var(--accent)]/50 rounded-[2.5rem] p-8 md:p-12 max-w-xl w-full shadow-[0_40px_100px_rgba(0,0,0,0.2)] dark:shadow-[0_0_120px_rgba(106,13,173,0.3)] overflow-hidden animate-scaleIn flex flex-col max-h-[90vh]"
+        className="relative bg-[var(--bg-primary)] border border-[var(--accent)]/30 dark:border-[var(--accent)]/50 rounded-[2.5rem] p-4 sm:p-6 md:p-12 max-w-sm sm:max-w-xl md:max-w-xl w-full shadow-[0_40px_100px_rgba(0,0,0,0.2)] dark:shadow-[0_0_120px_rgba(106,13,173,0.3)] overflow-hidden animate-scaleIn flex flex-col max-h-[85vh] sm:max-h-[90vh]"
       >
         {/* Decorative background flare */}
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-48 bg-[var(--accent)]/10 dark:bg-[var(--accent)]/20 blur-[80px] pointer-events-none" />
@@ -49,11 +111,11 @@ export default function BattleWinnerModal({ winners, onClose }) {
           {/* Content Area */}
           <div className="flex-1 overflow-y-auto pr-1 -mr-2 custom-scrollbar min-h-0">
             {hasHistory ? (
-              <div className="grid grid-cols-2 gap-5 mb-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-5 mb-2">
                 {displayWinners.map((winner, idx) => (
                   <div 
                     key={winner.id} 
-                    className="bg-[var(--card-bg)] border border-[var(--accent)]/10 dark:border-white/10 rounded-[1.5rem] p-5 flex flex-col hover:border-[var(--accent)]/40 transition-all group relative overflow-hidden h-full"
+                    className="bg-[var(--card-bg)] border border-[var(--accent)]/10 dark:border-white/10 rounded-[1rem] sm:rounded-[1.5rem] p-3 sm:p-5 flex flex-col hover:border-[var(--accent)]/40 transition-all group relative overflow-hidden h-full"
                   >
                     <div className="flex justify-between items-start mb-3">
                       <div className="text-[8px] text-[var(--text-secondary)]/40 font-bold uppercase tracking-widest opacity-60">
@@ -77,14 +139,14 @@ export default function BattleWinnerModal({ winners, onClose }) {
                 ))}
               </div>
             ) : (
-              <div className="bg-[var(--card-bg)] border border-[var(--accent)]/10 dark:border-white/10 rounded-[2rem] p-12 text-center flex flex-col items-center">
-                <div className="w-20 h-20 rounded-full bg-[var(--accent)]/5 dark:bg-[var(--accent)]/10 flex items-center justify-center mb-6 border border-[var(--accent)]/10 dark:border-[var(--accent)]/20 animate-pulse">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)]">
+              <div className="bg-[var(--card-bg)] border border-[var(--accent)]/10 dark:border-white/10 rounded-[1.5rem] sm:rounded-[2rem] p-6 sm:p-12 text-center flex flex-col items-center">
+                <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full bg-[var(--accent)]/5 dark:bg-[var(--accent)]/10 flex items-center justify-center mb-4 sm:mb-6 border border-[var(--accent)]/10 dark:border-[var(--accent)]/20 animate-pulse">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" sm:width="32" sm:height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)]">
                     <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                   </svg>
                 </div>
-                <h3 className="text-2xl font-black text-[var(--text-primary)] mb-2 uppercase tracking-tighter">Battle begins on</h3>
-                <p className="text-lg font-black text-[var(--text-primary)] opacity-80 uppercase tracking-wider">20 March 2026 13:00 KST</p>
+                <h3 className="text-lg sm:text-2xl font-black text-[var(--text-primary)] mb-2 uppercase tracking-tighter">Battle begins on</h3>
+                <p className="text-sm sm:text-lg font-black text-[var(--text-primary)] opacity-80 uppercase tracking-wider">20 March 2026 13:00 KST</p>
               </div>
             )}
           </div>
@@ -95,7 +157,7 @@ export default function BattleWinnerModal({ winners, onClose }) {
 
           <button
             onClick={onClose}
-            className="mt-4 w-full bg-[var(--accent)] py-5 rounded-[1.5rem] text-[var(--bg-primary)] dark:text-white font-black uppercase tracking-[0.2em] hover:brightness-110 active:scale-[0.98] transition-all shadow-[0_15px_30px_rgba(var(--accent-rgb),0.3)] text-sm shrink-0"
+            className="mt-4 w-full bg-[var(--accent)] py-3 sm:py-5 rounded-[1rem] sm:rounded-[1.5rem] text-[var(--bg-primary)] dark:text-white font-black uppercase tracking-[0.2em] hover:brightness-110 active:scale-[0.98] transition-all shadow-[0_15px_30px_rgba(var(--accent-rgb),0.3)] text-xs sm:text-sm shrink-0"
           >
             {hasHistory ? "I'm Ready for Today's Battle!" : "I'm Ready"}
           </button>
@@ -129,6 +191,27 @@ export default function BattleWinnerModal({ winners, onClose }) {
           }
           .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             opacity: 0.4;
+          }
+          .confetti-piece {
+            border-radius: 2px;
+            opacity: 0.95;
+            will-change: transform, opacity;
+            animation-name: confettiFall;
+            animation-timing-function: cubic-bezier(.2,.8,.2,1);
+            animation-fill-mode: both;
+          }
+          @keyframes confettiFall {
+            0% {
+              transform: translate3d(0, -10vh, 0) rotate(0deg);
+              opacity: 0;
+            }
+            12% {
+              opacity: 1;
+            }
+            100% {
+              transform: translate3d(var(--confetti-drift, 0px), 110vh, 0) rotate(540deg);
+              opacity: 0;
+            }
           }
         ` }} />
       </div>
