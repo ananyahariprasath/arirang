@@ -53,21 +53,22 @@ export default async function handler(req, res) {
       },
     };
 
+    console.log("Initializing SMTP transport...");
     if (process.env.SMTP_HOST) {
-      // Explicit Host (Production or Custom SMTP)
+      console.log(`Using custom host: ${process.env.SMTP_HOST}:${process.env.SMTP_PORT || 587}`);
       smtpConfig.host = process.env.SMTP_HOST;
       smtpConfig.port = parseInt(process.env.SMTP_PORT) || 587;
       smtpConfig.secure = process.env.SMTP_SECURE === "true" || smtpConfig.port === 465;
     } else if (process.env.SMTP_SERVICE) {
-      // Specific Service (e.g. "gmail", "sendgrid")
+      console.log(`Using service: ${process.env.SMTP_SERVICE}`);
       smtpConfig.service = process.env.SMTP_SERVICE;
     } else if (process.env.SMTP_USER && process.env.SMTP_USER.includes("ethereal.email")) {
-      // Local Development Auto-detection for Ethereal
+      console.log("Local Ethereal auto-detected.");
       smtpConfig.host = "smtp.ethereal.email";
       smtpConfig.port = 587;
       smtpConfig.secure = false;
     } else {
-      // Default fallback (Gmail is common for hobby projects)
+      console.log("No specific host or service set, falling back to gmail service.");
       smtpConfig.service = "gmail";
     }
 
@@ -86,12 +87,19 @@ export default async function handler(req, res) {
         await transporter.sendMail(mailOptions);
         console.log("Email sent successfully to:", email);
       } catch (mailError) {
-        console.error("Nodemailer sendMail failed:", mailError);
-        // We still throw to trigger the 500 in the outer reach because the OTP wasn't sent
+        console.error("Nodemailer sendMail failed. Config used:", {
+          ...smtpConfig,
+          auth: { user: smtpConfig.auth.user, pass: "***" }
+        });
+        console.error("Error Detail:", mailError);
         throw mailError;
       }
     } else {
-      console.warn("SMTP credentials missing. Mocking email send. OTP is:", otp);
+      console.warn("SMTP_USER or SMTP_PASS missing. Mail NOT sent. OTP is:", otp);
+      // If we are in production, this is a failure
+      if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+         return res.status(500).json({ error: "Mail configuration missing on server." });
+      }
     }
 
     return res.status(200).json({ success: true, message: "If an account exists, an OTP has been sent." });

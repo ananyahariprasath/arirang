@@ -246,7 +246,7 @@ function AuthPage() {
               {loading ? "Verifying..." : "Verify OTP"}
             </button>
             <div className="flex flex-col gap-3 mt-2">
-              <button type="button" onClick={() => { setMode("forgot"); setError(""); }} className="w-full py-3 rounded-xl border border-[var(--accent)]/30 text-[var(--text-secondary)] font-bold hover:bg-[var(--accent)]/10 transition-all">Resend OTP / Back</button>
+              <button type="button" onClick={() => { setMode("forgot"); setError(""); }} className="w-full py-3 rounded-xl border border-[var(--accent)]/30 text-[var(--text-secondary)] font-bold hover:bg-[var(--accent)]/10 transition-all">Resend OTP</button>
               <button type="button" onClick={() => { setMode("login"); setError(""); }} className="w-full py-3 rounded-xl border border-[var(--accent)]/30 text-[var(--accent)] font-bold hover:bg-[var(--accent)]/10 transition-all">Back to Login</button>
             </div>
           </form>
