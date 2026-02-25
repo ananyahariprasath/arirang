@@ -1,0 +1,33 @@
+name: Last.fm Sync
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  trigger-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Last.fm sync endpoint
+        env:
+          SYNC_URL: ${{ secrets.LASTFM_SYNC_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SYNC_URL}" ] || [ -z "${CRON_SECRET}" ]; then
+            echo "Missing required secrets: LASTFM_SYNC_URL and/or CRON_SECRET"
+            exit 1
+          fi
+
+          HTTP_STATUS=$(curl -sS -o response.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            "${SYNC_URL}")
+
+          echo "HTTP status: ${HTTP_STATUS}"
+          cat response.json
+
+          if [ "${HTTP_STATUS}" -lt 200 ] || [ "${HTTP_STATUS}" -ge 300 ]; then
+            exit 1
+          fi
