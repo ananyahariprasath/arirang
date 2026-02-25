@@ -18,6 +18,8 @@ import YoutubeEmbed from "../components/section-1/YoutubeEmbed";
 import LanguageDropdown from "../components/section-1/LanguageDropdown";
 import PreSaveQR from "../components/section-1/PreSaveQR";
 import CountdownTimer from "../components/section-1/CountdownTimer";
+import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 
 
 function Home({ onNavigateToProof, onOpenAdmin }) {
@@ -26,9 +28,8 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
   const [isRecentBattlesOpen, setIsRecentBattlesOpen] = useState(false);
   const [isContactOpen, setIsContactOpen] = useState(false);
   const [isWinnerModalOpen, setIsWinnerModalOpen] = useState(false);
-  const [liveRefreshToken, setLiveRefreshToken] = useState(0);
-  const [isLiveRefreshing, setIsLiveRefreshing] = useState(false);
   const { theme } = useTheme();
+  const [resetCountdown, setResetCountdown] = useState("00:00:00");
 
   const [localNow, setLocalNow] = useState("");
   const [timeZone, setTimeZone] = useState("");
@@ -54,8 +55,69 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
     return () => clearInterval(localTimer);
   }, []);
 
+  useEffect(() => {
+    const updateResetCountdown = () => {
+      const now = new Date();
+      const nextUtcMidnight = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() + 1,
+        0,
+        0,
+        0
+      ));
+      const diffMs = Math.max(0, nextUtcMidnight.getTime() - now.getTime());
+
+      const totalSeconds = Math.floor(diffMs / 1000);
+      const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+      const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+      const seconds = String(totalSeconds % 60).padStart(2, "0");
+      setResetCountdown(`${hours}:${minutes}:${seconds}`);
+    };
+
+    updateResetCountdown();
+    const timer = setInterval(updateResetCountdown, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const { isExpired } = useCountdown();
   const { battles, loading } = useBattles();
+  const { user, updateUser } = useAuth();
+  const toast = useToast();
+
+  // Handle Last.fm Callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get("token");
+
+    if (token && user && !user.lastfmUsername) {
+      const linkLastFm = async () => {
+        try {
+          const res = await fetch("/api/auth/lastfm-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token, userId: user.id })
+          });
+          
+          const data = await res.json();
+          if (res.ok) {
+            updateUser({ ...user, lastfmUsername: data.lastfmUsername });
+            toast.show(`Successfully linked Last.fm account: ${data.lastfmUsername}`, "success");
+          } else {
+            toast.show(data.error || "Failed to link Last.fm", "error");
+          }
+        } catch (err) {
+          console.error("Last.fm linking error:", err);
+          toast.show("An error occurred while linking Last.fm", "error");
+        } finally {
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      };
+
+      linkLastFm();
+    }
+  }, [user, updateUser, toast]);
 
   // Trigger Winner Modal on entry if there are previous results
   useEffect(() => {
@@ -140,38 +202,24 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
 
             {/* Column 3: Live Battle Cards (Right) */}
             <div className="flex flex-col gap-2 lg:h-full lg:min-h-0 lg:overflow-hidden">
-              <div className="h-[32px] flex items-center justify-between shrink-0 px-1">
-                <h2 className="text-lg font-black text-[var(--accent)] uppercase tracking-widest">Live Battles</h2>
-                <button
-                  onClick={() => {
-                    if (isLiveRefreshing) return;
-                    setIsLiveRefreshing(true);
-                    setLiveRefreshToken((v) => v + 1);
-                  }}
-                  disabled={isLiveRefreshing}
-                  title="Refresh live battles"
-                  className="w-8 h-8 rounded-lg border border-[var(--accent)]/30 text-[var(--accent)] flex items-center justify-center hover:bg-[var(--accent)]/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLiveRefreshing ? (
-                    <svg className="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-                    </svg>
+              <div className="min-h-[32px] shrink-0 px-1 grid grid-cols-1 xl:grid-cols-[auto_1fr] items-start gap-1 xl:gap-2">
+                <h2 className="text-lg font-black text-[var(--accent)] uppercase tracking-[0.12em] sm:tracking-widest leading-none whitespace-nowrap">Live Battles</h2>
+                <p className="min-w-0 text-[9px] sm:text-[9px] font-black uppercase tracking-wide text-[var(--text-secondary)] leading-tight text-left xl:text-right whitespace-normal break-words">
+                  {isExpired ? (
+                    <>
+                      <span>Time left for reset:</span>
+                      <span className="ml-1 text-[10px] sm:text-[12px] font-extrabold tracking-wider text-[var(--accent)] tabular-nums">
+                        {resetCountdown}
+                      </span>
+                    </>
                   ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="23 4 23 10 17 10"></polyline>
-                      <polyline points="1 20 1 14 7 14"></polyline>
-                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path>
-                      <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path>
-                    </svg>
+                    "Battle begins on: March 20, 2026 13:00 KST"
                   )}
-                </button>
+                </p>
               </div>
               {/* Mobile: natural height stacked cards; Desktop: fills column */}
-              <div className="flex flex-col gap-2 lg:flex-1 lg:min-h-0 lg:overflow-hidden">
-                <StreamingBattle
-                  refreshToken={liveRefreshToken}
-                  onRefreshStateChange={(loading) => setIsLiveRefreshing(Boolean(loading))}
-                />
+              <div className="flex flex-col gap-2 max-h-[58vh] overflow-y-auto no-scrollbar pr-1 lg:max-h-none lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+                <StreamingBattle />
               </div>
             </div>
 

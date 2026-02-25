@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import Home from "./pages/Home";
 import AdminPanel from "./pages/AdminPanel";
-import SubmitProofPage from "./pages/SubmitProofPage";
 import Footer from "./components/layout/Footer";
 import AuthPage from "./pages/AuthPage";
 

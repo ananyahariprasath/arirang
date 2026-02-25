@@ -1,4 +1,7 @@
 {
+  "crons": [
+    { "path": "/api/cron/lastfm-sync", "schedule": "* * * * *" }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ]

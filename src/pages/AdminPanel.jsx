@@ -522,6 +522,12 @@ function AdminPanel() {
     setShowCountryDrop(false);
   };
 
+  const formatBattleTimeLabel = (value) => {
+    const timeText = String(value || "").trim();
+    if (!timeText) return "N/A";
+    return /[A-Za-z]/.test(timeText) ? timeText : `${timeText} KST`;
+  };
+
 
 
   return (
@@ -554,7 +560,6 @@ function AdminPanel() {
                 
                 <div className="absolute top-full right-0 md:left-0 md:right-auto mt-3 w-56 bg-[var(--bg-primary)]/90 backdrop-blur-3xl border border-[var(--accent)]/40 p-2 rounded-2xl shadow-2xl z-50 flex flex-col gap-1 animate-in slide-in-from-top-2 fade-in duration-200">
                   <MenuButton tab="tickets" label="Support Tickets" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
-                  <MenuButton tab="proofSubmissions" label="Proof Submissions" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="battles" label="Battle Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="timeline" label="Timeline Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="regions" label="Region Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
@@ -632,10 +637,6 @@ function AdminPanel() {
               </div>
             )}
           </section>
-        )}
-
-        {activeTab === "proofSubmissions" && (
-          <AdminViewPanel />
         )}
 
         {activeTab === "battles" && (
@@ -721,7 +722,7 @@ function AdminPanel() {
                           <div>
                             <div className="flex items-center gap-3 mb-1">
                               <span className="text-lg font-black text-[var(--accent)]">{battle.date}</span>
-                              <span className="text-xs text-[var(--text-secondary)] font-bold uppercase tracking-widest">{battle.time} KST</span>
+                              <span className="text-xs text-[var(--text-secondary)] font-bold uppercase tracking-widest">{formatBattleTimeLabel(battle.time)}</span>
                             </div>
                             <div className="flex flex-wrap gap-1">
                               {battle.regions.map(r => (
@@ -796,15 +797,84 @@ function AdminPanel() {
                           className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]"
                         />
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Goal</label>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Region A (Left)</label>
                           <input
                             type="text"
-                            value={lb.goal}
+                            value={lb.regionA || ""}
                             onChange={(e) => {
                               const updated = [...liveEdits];
-                              updated[i] = { ...updated[i], goal: e.target.value };
+                              updated[i] = { ...updated[i], regionA: e.target.value };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Region B (Right)</label>
+                          <input
+                            type="text"
+                            value={lb.regionB || ""}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], regionB: e.target.value };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm transition-all"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Artist</label>
+                          <input
+                            type="text"
+                            value={lb.artist || ""}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], artist: e.target.value };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Album Target</label>
+                          <input
+                            type="text"
+                            value={lb.albumName || ""}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], albumName: e.target.value };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Title Track Target</label>
+                          <input
+                            type="text"
+                            value={lb.trackName || ""}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], trackName: e.target.value };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm transition-all"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Album Goal</label>
+                          <input
+                            type="text"
+                            value={lb.albumGoal ?? lb.goal ?? ""}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], goal: e.target.value, albumGoal: e.target.value };
                               setLiveEdits(updated);
                             }}
                             className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]"
@@ -834,7 +904,7 @@ function AdminPanel() {
                             }}
                             className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all appearance-none text-[var(--text-primary)]"
                           >
-                            {["Yet to Start", "Surging", "On Track", "Heating Up", "Almost There"].map(s => (
+                            {["Yet to Start", "Surging", "On Track", "Heating Up", "Almost There", "Completed"].map(s => (
                               <option key={s} value={s}>{s}</option>
                             ))}
                           </select>
@@ -878,17 +948,93 @@ function AdminPanel() {
                             }}
                             className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all appearance-none text-[var(--text-primary)]"
                           >
-                            {["Yet to Start", "Surging", "On Track", "Heating Up", "Almost There"].map(s => (
+                            {["Yet to Start", "Surging", "On Track", "Heating Up", "Almost There", "Completed"].map(s => (
                               <option key={s} value={s}>{s}</option>
                             ))}
                           </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Region A Album (Manual)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={lb.regionAAlbumManual ?? 0}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], regionAAlbumManual: parseInt(e.target.value, 10) || 0 };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Region B Album (Manual)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={lb.regionBAlbumManual ?? 0}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], regionBAlbumManual: parseInt(e.target.value, 10) || 0 };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm transition-all"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Region A Title (Manual)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={lb.regionATitleManual ?? 0}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], regionATitleManual: parseInt(e.target.value, 10) || 0 };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Region B Title (Manual)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={lb.regionBTitleManual ?? 0}
+                            onChange={(e) => {
+                              const updated = [...liveEdits];
+                              updated[i] = { ...updated[i], regionBTitleManual: parseInt(e.target.value, 10) || 0 };
+                              setLiveEdits(updated);
+                            }}
+                            className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm transition-all"
+                          />
                         </div>
                       </div>
                     </div>
                   </div>
                 ))}
                 <button
-                  onClick={() => { updateLiveBattles(liveEdits); toast.show("All live battles updated! 💜", "success"); }}
+                  onClick={async () => {
+                    updateLiveBattles(liveEdits);
+                    try {
+                      const response = await fetch("/api/live-battles-config", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ liveBattles: liveEdits }),
+                      });
+                      const data = await response.json().catch(() => ({}));
+                      if (!response.ok) {
+                        throw new Error(data.error || "Failed to publish live battle config");
+                      }
+                      toast.show("All live battles updated and published!", "success");
+                    } catch (error) {
+                      toast.show(error.message || "Local update saved, but publish failed", "error");
+                    }
+                  }}
                   className="w-full bg-[var(--accent)] text-white font-black py-3 rounded-xl text-xs shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all"
                 >
                   UPDATE ALL LIVE BATTLES

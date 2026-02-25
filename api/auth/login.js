@@ -60,6 +60,9 @@ export default async function handler(req, res) {
         username: user.username,
         role: user.role,
         profilePicture: user.profilePicture || null,
+        lastfmUsername: user.lastfmUsername || null,
+        country: user.country || null,
+        region: user.region || null,
       }
     });
 

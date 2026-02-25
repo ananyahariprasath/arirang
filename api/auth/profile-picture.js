@@ -74,7 +74,10 @@ export default async function handler(req, res) {
         email: result.email,
         username: result.username,
         role: result.role,
-        profilePicture: result.profilePicture
+        profilePicture: result.profilePicture,
+        lastfmUsername: result.lastfmUsername || null,
+        country: result.country || null,
+        region: result.region || null,
       }
     });
 

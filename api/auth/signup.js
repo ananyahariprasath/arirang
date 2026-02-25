@@ -23,10 +23,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email, password, username } = req.body || {};
+    const { email, password, username, country, region } = req.body || {};
 
-    if (!email || !password || !username) {
-      return res.status(400).json({ error: "Email, password, and username are required" });
+    if (!email || !password || !username || !country || !region) {
+      return res.status(400).json({ error: "Email, password, username, country, and region are required" });
     }
 
     const db = await getDb();
@@ -47,6 +47,8 @@ export default async function handler(req, res) {
       email,
       username,
       password: hashedPassword,
+      country,
+      region,
       role: "user", // Default role
       createdAt: now,
     };
@@ -68,7 +70,10 @@ export default async function handler(req, res) {
         email: newUser.email,
         username: newUser.username,
         role: newUser.role,
+        country: newUser.country,
+        region: newUser.region,
         profilePicture: null,
+        lastfmUsername: null,
       }
     });
 

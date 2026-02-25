@@ -2,6 +2,72 @@ import { useState } from "react";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import HelpDeskModal from "../modals/HelpDeskModal";
+import ConfirmModal from "../modals/ConfirmModal";
+
+
+function IconCamera({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <path d="M4 7h4l2-2h4l2 2h4v12H4z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  );
+}
+
+function IconMusic({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <path d="M9 18V6l10-2v12" />
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="16" cy="16" r="3" />
+    </svg>
+  );
+}
+
+function IconDisconnect({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <path d="M10 14L21 3" />
+      <path d="M21 8V3h-5" />
+      <path d="M14 10V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-4" />
+    </svg>
+  );
+}
+
+function IconMoon({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+    </svg>
+  );
+}
+
+function IconSun({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+    </svg>
+  );
+}
+
+function IconTools({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.3 2.3-2.4-2.4z" />
+    </svg>
+  );
+}
+
+function IconLogout({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="M16 17l5-5-5-5" />
+      <path d="M21 12H9" />
+    </svg>
+  );
+}
 
 
 function Header({ onToggleSection }) {
@@ -13,6 +79,8 @@ function Header({ onToggleSection }) {
   const [isProfilePicModalOpen, setIsProfilePicModalOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isConfirmDisconnectOpen, setIsConfirmDisconnectOpen] = useState(false);
+
 
   // Generate initials for avatar fallback
   const getInitials = (name) => {
@@ -35,18 +103,18 @@ function Header({ onToggleSection }) {
           </div>
 
           {/* Center: Website Name */}
-          <div className="flex-1 md:absolute md:left-1/2 md:-translate-x-1/2 md:w-max text-center pointer-events-none px-2">
-            <h1 className="text-xs sm:text-base md:text-3xl font-black tracking-widest md:tracking-[0.2em] uppercase text-[var(--accent)] pointer-events-auto">
+          <div className="flex-1 min-w-0 xl:absolute xl:left-1/2 xl:-translate-x-1/2 xl:w-max text-center pointer-events-none px-2 xl:px-6">
+            <h1 className="block text-[11px] sm:text-base lg:text-2xl xl:text-3xl font-black tracking-[0.08em] sm:tracking-widest xl:tracking-[0.2em] uppercase text-[var(--accent)] pointer-events-auto leading-tight whitespace-normal lg:whitespace-nowrap break-words">
               ARIRANG SPOTIFY TAKEOVER!!!
             </h1>
           </div>
 
           {/* Right Section - Desktop */}
-          <div className="hidden md:flex items-center gap-6">
+          <div className="hidden md:flex items-center gap-3 lg:gap-4 xl:gap-6">
             {/* Help Desk Button */}
             <button
               onClick={() => setIsHelpOpen(true)}
-              className="px-6 py-2.5 text-sm font-bold rounded-2xl
+              className="px-4 lg:px-5 xl:px-6 py-2 lg:py-2.5 text-xs lg:text-sm font-bold rounded-2xl
                bg-[var(--card-bg)]/40 backdrop-blur-xl
                border border-[var(--accent)]/40
                hover:bg-[var(--accent)]/10
@@ -91,19 +159,33 @@ function Header({ onToggleSection }) {
                       }}
                       className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--accent)]/10 transition-colors flex items-center gap-2"
                     >
-                      <span>📸</span> Change Profile Picture
+                      <IconCamera /> Change Profile Picture
                     </button>
 
-                    <button
-                      onClick={() => {
-                        setIsProfileDropdownOpen(false);
-                        // Future Last.fm Link Logic here
-                        alert("Last.fm authentication coming soon!");
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--accent)]/10 transition-colors flex items-center gap-2"
-                    >
-                      <span>🎵</span> Connect Last.fm
-                    </button>
+                    {user.lastfmUsername ? (
+                      <button
+                        onClick={() => setIsConfirmDisconnectOpen(true)}
+                        className="w-full text-left px-4 py-2.5 text-sm text-red-500/80 hover:bg-red-500/10 transition-colors flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          <IconDisconnect /> Disconnect Last.fm
+                        </div>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setIsProfileDropdownOpen(false);
+                          const apiKey = "464d8861f37218838766eef3f52b0bb0";
+                          const cb = window.location.origin;
+                          window.location.href = `https://www.last.fm/api/auth/?api_key=${apiKey}&cb=${cb}`;
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--accent)]/10 transition-colors flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2">
+                          <IconMusic /> Connect Last.fm
+                        </div>
+                      </button>
+                    )}
 
                     <button
                       onClick={() => {
@@ -113,7 +195,7 @@ function Header({ onToggleSection }) {
                       className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--accent)]/10 transition-colors flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2">
-                        <span>{theme === "light" ? "🌙" : "☀️"}</span> Theme
+                        {theme === "light" ? <IconMoon /> : <IconSun />} Theme
                       </div>
                       <span className="text-xs text-[var(--text-secondary)] capitalize">{theme}</span>
                     </button>
@@ -126,7 +208,7 @@ function Header({ onToggleSection }) {
                         }}
                         className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--accent)]/10 transition-colors flex items-center gap-2 font-bold"
                       >
-                        <span>🛠️</span> Admin Panel
+                        <IconTools /> Admin Panel
                       </button>
                     )}
 
@@ -138,7 +220,7 @@ function Header({ onToggleSection }) {
                         }}
                         className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-500/10 transition-colors flex items-center gap-2 font-bold"
                       >
-                        <span>🚪</span> Logout
+                        <IconLogout /> Logout
                       </button>
                     </div>
                   </div>
@@ -183,7 +265,7 @@ function Header({ onToggleSection }) {
                     ${theme === "dark" ? "translate-x-6" : ""}
                   `}
                   >
-                    {theme === "light" ? "☀️" : "🌙"}
+                    {theme === "light" ? <IconSun className="w-3 h-3 text-amber-500" /> : <IconMoon className="w-3 h-3 text-slate-700" />}
                   </span>
                 </button>
               </div>
@@ -230,7 +312,7 @@ function Header({ onToggleSection }) {
                     }}
                     className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all flex items-center justify-center gap-2"
                   >
-                    <span>📸</span> Change Avatar
+                    <IconCamera /> Change Avatar
                   </button>
 
                   {user?.role === "admin" && (
@@ -241,28 +323,42 @@ function Header({ onToggleSection }) {
                       }}
                       className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 hover:bg-[var(--accent)]/20 transition-all flex items-center justify-center gap-2"
                     >
-                      <span>🛠️</span> Admin Panel
+                      <IconTools /> Admin Panel
                     </button>
                   )}
 
-                  <button
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      alert("Last.fm authentication coming soon!");
-                    }}
-                    className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all flex items-center justify-center gap-2"
-                  >
-                    <span>🎵</span> Connect Last.fm
-                  </button>
+                  {user.lastfmUsername ? (
+                    <button
+                      onClick={() => {
+                        setIsConfirmDisconnectOpen(true);
+                        setIsMenuOpen(false);
+                      }}
+                      className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-all flex items-center justify-center gap-2"
+                    >
+                      <IconDisconnect /> Disconnect Last.fm ({user.lastfmUsername})
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        const apiKey = "464d8861f37218838766eef3f52b0bb0";
+                        const cb = window.location.origin;
+                        window.location.href = `https://www.last.fm/api/auth/?api_key=${apiKey}&cb=${cb}`;
+                      }}
+                      className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all flex items-center justify-center gap-2"
+                    >
+                      <IconMusic /> Connect Last.fm
+                    </button>
+                  )}
 
                   <button
                     onClick={() => {
                       logout();
                       setIsMenuOpen(false);
                     }}
-                    className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-all"
+                    className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-all flex items-center justify-center gap-2"
                   >
-                    Logout
+                    <IconLogout /> Logout
                   </button>
                 </div>
               )}
@@ -371,7 +467,31 @@ function Header({ onToggleSection }) {
       )}
 
       <HelpDeskModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+
+      <ConfirmModal 
+        isOpen={isConfirmDisconnectOpen}
+        onClose={() => setIsConfirmDisconnectOpen(false)}
+        onConfirm={async () => {
+          try {
+            const res = await fetch("/api/auth/lastfm-session", {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId: user.id })
+            });
+            if (res.ok) {
+              updateUser({ ...user, lastfmUsername: null });
+            }
+          } catch (err) {
+            console.error("Disconnect error:", err);
+          }
+        }}
+        title="Disconnect Last.fm"
+        message="Are you sure you want to disconnect your Last.fm account? You'll need to authorize Arirang Spotify Takeover again if you want to reconnect."
+        confirmText="Yes, Disconnect"
+        cancelText="No, Keep it"
+      />
     </>
+
   );
 }
 

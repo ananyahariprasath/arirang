@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import HelpDeskModal from "../components/modals/HelpDeskModal";
+import { COUNTRIES, COUNTRY_REGION_MAP } from "../constants";
 
 function AuthPage() {
   const [mode, setMode] = useState("login"); // login, signup, forgot, verify-otp, reset
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+  const [signupCountry, setSignupCountry] = useState("");
   const [otp, setOtp] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -49,13 +51,18 @@ function AuthPage() {
 
   const handleSignup = async (e) => {
     e.preventDefault();
-    setError("");
+    if (!email || !password || !username || !signupCountry) {
+      setError("Please fill in all fields.");
+      return;
+    }
     setLoading(true);
+    setError("");
     try {
+      const region = COUNTRY_REGION_MAP[signupCountry] || "Global";
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, username }),
+        body: JSON.stringify({ email, password, username, country: signupCountry, region })
       });
       const data = await res.json();
       if (res.ok) {
@@ -207,6 +214,19 @@ function AuthPage() {
               >
                 {showPassword ? "👁️" : "🫣"}
               </button>
+            </div>
+            <div>
+              <select 
+                value={signupCountry} 
+                onChange={e => setSignupCountry(e.target.value)} 
+                required 
+                className="w-full px-5 py-4 rounded-2xl bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 focus:border-[var(--accent)] outline-none transition-colors text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/50 text-lg shadow-inner appearance-none cursor-pointer"
+              >
+                <option value="" disabled className="bg-[var(--bg-secondary)]">Select Country</option>
+                {COUNTRIES.sort().map(c => (
+                  <option key={c} value={c} className="bg-[var(--bg-secondary)]">{c}</option>
+                ))}
+              </select>
             </div>
             {error && <p className="text-red-400 text-sm mt-2 ml-1">{error}</p>}
             <button type="submit" disabled={loading} className="w-full px-5 py-4 rounded-2xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/80 transition-all font-bold tracking-wider text-lg shadow-lg shadow-[var(--accent)]/20 hover:-translate-y-1">

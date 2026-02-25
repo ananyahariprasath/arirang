@@ -80,12 +80,28 @@ export default function useGalleryData() {
 
   useEffect(() => {
     const loadData = async () => {
+      let hasServerConfig = false;
       try {
+        const configResponse = await fetch("/api/app-config?key=galleryImages", { cache: "no-store" });
+        if (configResponse.ok) {
+          const configData = await configResponse.json();
+          if (Array.isArray(configData?.value)) {
+            setGalleryImages(configData.value);
+            localStorage.setItem("galleryImages", JSON.stringify(configData.value));
+            hasServerConfig = true;
+          }
+        }
+
         if (DATA_SOURCE_URL) {
           const response = await fetch(`${DATA_SOURCE_URL}?t=${Date.now()}`, { cache: "no-store" });
           const data = await response.json();
-          if (data.galleryImages && Array.isArray(data.galleryImages)) {
+          if (!hasServerConfig && data.galleryImages && Array.isArray(data.galleryImages)) {
             setGalleryImages(data.galleryImages);
+            localStorage.setItem("galleryImages", JSON.stringify(data.galleryImages));
+            setLoading(false);
+            return;
+          }
+          if (hasServerConfig || (data.galleryImages && Array.isArray(data.galleryImages))) {
             setLoading(false);
             return;
           }
@@ -94,12 +110,13 @@ export default function useGalleryData() {
         console.error("Failed to fetch gallery config:", error);
       }
 
-      // Check localStorage
-      const saved = localStorage.getItem("galleryImages");
-      if (saved) {
-        setGalleryImages(JSON.parse(saved));
-      } else {
-        setGalleryImages(INITIAL_GALLERY_IMAGES);
+      if (!hasServerConfig) {
+        const saved = localStorage.getItem("galleryImages");
+        if (saved) {
+          setGalleryImages(JSON.parse(saved));
+        } else {
+          setGalleryImages(INITIAL_GALLERY_IMAGES);
+        }
       }
       setLoading(false);
     };
@@ -107,15 +124,29 @@ export default function useGalleryData() {
     loadData();
   }, []);
 
+  const persistGallery = async (nextGallery) => {
+    try {
+      await fetch("/api/app-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "galleryImages", value: nextGallery }),
+      });
+    } catch (error) {
+      console.error("Failed to persist gallery config:", error);
+    }
+  };
+
   const resetGallery = () => {
     setGalleryImages(INITIAL_GALLERY_IMAGES);
-    localStorage.removeItem("galleryImages");
+    localStorage.setItem("galleryImages", JSON.stringify(INITIAL_GALLERY_IMAGES));
+    void persistGallery(INITIAL_GALLERY_IMAGES);
   };
 
   const addGalleryImage = (newImg) => {
     setGalleryImages(prev => {
       const updated = [newImg, ...prev];
       localStorage.setItem("galleryImages", JSON.stringify(updated));
+      void persistGallery(updated);
       return updated;
     });
   };
@@ -124,6 +155,7 @@ export default function useGalleryData() {
     setGalleryImages(prev => {
       const updated = prev.filter(img => img.src !== srcToRemove);
       localStorage.setItem("galleryImages", JSON.stringify(updated));
+      void persistGallery(updated);
       return updated;
     });
   };
@@ -132,6 +164,7 @@ export default function useGalleryData() {
     setGalleryImages(prev => {
       const updated = prev.map(img => img.src === src ? { ...img, ...updatedImg } : img);
       localStorage.setItem("galleryImages", JSON.stringify(updated));
+      void persistGallery(updated);
       return updated;
     });
   };

@@ -145,12 +145,12 @@ function CountryModal({ selectedCountry, onClose, onSubmitProof }) {
               * Please use the 20 focus playlists above to stream and support.
             </p>
           </div>
-          <button
+          {/* <button
             onClick={() => onSubmitProof?.(selectedCountry)}
             className="w-full sm:w-fit px-8 py-4 rounded-2xl bg-[var(--accent)] text-black dark:text-black font-black uppercase text-xs tracking-[0.1em] hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[var(--accent)]/20 text-center"
           >
             Submit Proof 💜
-          </button>
+          </button> */}
         </div>
 
       </div>
