@@ -17,7 +17,7 @@ function Timeline() {
     <div className="bg-[var(--card-bg)]/40 backdrop-blur-xl border border-[var(--accent)]/40 rounded-3xl p-4 md:p-6 shadow-2xl text-[var(--text-primary)] h-full flex flex-col overflow-hidden">
       <div className="flex justify-between items-center mb-6 shrink-0">
         <div>
-          <h2 className="text-2xl md:text-3xl font-black text-[var(--accent)] tracking-tighter">Streaming Map</h2>
+          <h2 className="text-2xl md:text-3xl font-black text-[var(--accent)] tracking-tighter">DAILY TARGET TIMELINE</h2>
           <p className="text-[9px] uppercase tracking-widest font-black opacity-30">Streaming Timeline</p>
         </div>
         {/* <div className="hidden sm:flex gap-4">

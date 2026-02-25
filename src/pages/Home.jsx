@@ -20,7 +20,7 @@ import PreSaveQR from "../components/section-1/PreSaveQR";
 import CountdownTimer from "../components/section-1/CountdownTimer";
 
 
-function Home({ onNavigateToProof }) {
+function Home({ onNavigateToProof, onOpenAdmin }) {
   const [selectedCountry, setSelectedCountry] = useState("Select your Country");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRecentBattlesOpen, setIsRecentBattlesOpen] = useState(false);
@@ -28,6 +28,7 @@ function Home({ onNavigateToProof }) {
   const [isWinnerModalOpen, setIsWinnerModalOpen] = useState(false);
   const [liveRefreshToken, setLiveRefreshToken] = useState(0);
   const [isLiveRefreshing, setIsLiveRefreshing] = useState(false);
+  const { theme } = useTheme();
 
   const [localNow, setLocalNow] = useState("");
   const [timeZone, setTimeZone] = useState("");
@@ -58,10 +59,10 @@ function Home({ onNavigateToProof }) {
 
   // Trigger Winner Modal on entry if there are previous results
   useEffect(() => {
-    // Always show the modal on first entry, even if history is empty
-    // The modal itself will handle the "Coming Soon" state
-    setIsWinnerModalOpen(true);
-  }, []);
+    if (isExpired) {
+      setIsWinnerModalOpen(true);
+    }
+  }, [isExpired]);
 
   const handleCountrySelect = (country) => {
     setSelectedCountry(country);
@@ -80,6 +81,8 @@ function Home({ onNavigateToProof }) {
     } else if (section === 'contact') {
       setIsContactOpen(!isContactOpen);
       setIsRecentBattlesOpen(false);
+    } else if (section === 'admin') {
+      onOpenAdmin?.();
     }
   };
 
@@ -102,7 +105,7 @@ function Home({ onNavigateToProof }) {
                 <div className="flex-1 overflow-y-auto min-h-0 no-scrollbar flex flex-col gap-1 pb-6 pt-1">
                   {/* Countdown Box Moved Up */}
                   <div className={`rounded-xl p-1.5 border transition-all duration-300
-                                ${useTheme().theme === "light"
+                                ${theme === "light"
                         ? "bg-[var(--aesthetic-purple)]/20 border-[var(--lavender)]"
                         : "bg-[#6A0DAD]/30 border-[#D8BFD8]/30 shadow-2xl"
                       }`}>

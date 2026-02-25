@@ -3,15 +3,17 @@ import Home from "./pages/Home";
 import AdminPanel from "./pages/AdminPanel";
 import SubmitProofPage from "./pages/SubmitProofPage";
 import Footer from "./components/layout/Footer";
-import AdminLoginModal from "./components/modals/AdminLoginModal";
+import AuthPage from "./pages/AuthPage";
 
 import { ToastProvider } from "./context/ToastContext";
 import ErrorBoundary from "./components/utils/ErrorBoundary";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
-function App() {
+function MainApp() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
   const [proofCountry, setProofCountry] = useState(null); // non-null = show SubmitProofPage
+  
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   const handleNavigateToProof = (country) => {
     setProofCountry(country);
@@ -23,25 +25,18 @@ function App() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Check for Ctrl + Shift + L
-      if (e.ctrlKey && e.shiftKey && (e.key === 'L' || e.key === 'l')) {
-        e.preventDefault();
-        setShowLoginModal(true);
-      }
+      // Admin shortcut removed since login is required natively
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const handleLoginSuccess = () => {
-    setShowLoginModal(false);
-    setIsAdminOpen(true);
-  };
-
   const handleCloseAdmin = () => {
     setIsAdminOpen(false);
   };
+
+  const hasAdminRole = user?.role === "admin";
 
   const content = (
     <>
@@ -52,36 +47,52 @@ function App() {
         />
       ) : (
         <>
-          <Home onNavigateToProof={handleNavigateToProof} />
+          <Home 
+            onNavigateToProof={handleNavigateToProof} 
+            onOpenAdmin={() => setIsAdminOpen(true)}
+          />
           <Footer />
         </>
-      )}
-
-      {showLoginModal && (
-        <AdminLoginModal
-          isOpen={showLoginModal}
-          onClose={() => setShowLoginModal(false)}
-          onLoginSuccess={handleLoginSuccess}
-        />
       )}
     </>
   );
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-[var(--accent)]/30 border-t-[var(--accent)] rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <AuthPage />;
+  }
+
+  return (
+    <>
+      {isAdminOpen && hasAdminRole ? (
+        <>
+          <AdminPanel />
+          <button 
+            onClick={handleCloseAdmin}
+            className="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded-lg opacity-50 hover:opacity-100 transition-opacity z-50 text-xs"
+          >
+            Exit Admin
+          </button>
+        </>
+      ) : content}
+    </>
+  );
+}
+function App() {
   return (
     <ErrorBoundary>
-      <ToastProvider>
-        {isAdminOpen ? (
-          <>
-            <AdminPanel />
-            <button 
-              onClick={handleCloseAdmin}
-              className="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded-lg opacity-50 hover:opacity-100 transition-opacity z-50 text-xs"
-            >
-              Exit Admin
-            </button>
-          </>
-        ) : content}
-      </ToastProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <MainApp />
+        </ToastProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }

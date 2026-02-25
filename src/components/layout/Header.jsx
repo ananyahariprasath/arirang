@@ -1,12 +1,24 @@
 import { useState } from "react";
 import { useTheme } from "../../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
 import HelpDeskModal from "../modals/HelpDeskModal";
 
 
 function Header({ onToggleSection }) {
   const { toggleTheme, theme } = useTheme();
+  const { user, token, logout, updateUser, openAuthModal } = useAuth();
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [isProfilePicModalOpen, setIsProfilePicModalOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // Generate initials for avatar fallback
+  const getInitials = (name) => {
+    if (!name) return "U";
+    return name.substring(0, 2).toUpperCase();
+  };
 
   return (
     <>
@@ -31,20 +43,6 @@ function Header({ onToggleSection }) {
 
           {/* Right Section - Desktop */}
           <div className="hidden md:flex items-center gap-6">
-            {/* Toggle Switch */}
-            <button
-              onClick={toggleTheme}
-              className="relative w-14 h-7 flex items-center rounded-full bg-[var(--accent)] transition-colors duration-300 flex-shrink-0"
-            >
-              <span
-                className={`absolute left-1 top-1 w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-300 flex items-center justify-center text-xs
-                ${theme === "dark" ? "translate-x-7" : ""}
-              `}
-              >
-                {theme === "light" ? "☀️" : "🌙"}
-              </span>
-            </button>
-
             {/* Help Desk Button */}
             <button
               onClick={() => setIsHelpOpen(true)}
@@ -56,6 +54,97 @@ function Header({ onToggleSection }) {
             >
               Help Desk
             </button>
+
+            {user && (
+              <div className="relative">
+                <button
+                  onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+                  className="w-10 h-10 rounded-full bg-[var(--accent)] text-white flex items-center justify-center font-bold overflow-hidden border-2 border-[var(--accent)]/50 hover:border-[var(--accent)] transition-colors focus:outline-none"
+                >
+                  {user.profilePicture ? (
+                    <img src={user.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{getInitials(user.username || user.email)}</span>
+                  )}
+                </button>
+
+                {isProfileDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-[var(--card-bg)] border border-[var(--accent)]/30 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                    <div className="px-4 py-3 border-b border-[var(--accent)]/10 bg-[var(--accent)]/5 flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[var(--accent)] text-white flex items-center justify-center font-bold overflow-hidden flex-shrink-0">
+                        {user.profilePicture ? (
+                          <img src={user.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+                        ) : (
+                          <span>{getInitials(user.username || user.email)}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold truncate">{user.username || "User"}</p>
+                        <p className="text-xs text-[var(--text-secondary)] truncate">{user.email}</p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setIsProfileDropdownOpen(false);
+                        setIsProfilePicModalOpen(true);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--accent)]/10 transition-colors flex items-center gap-2"
+                    >
+                      <span>📸</span> Change Profile Picture
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setIsProfileDropdownOpen(false);
+                        // Future Last.fm Link Logic here
+                        alert("Last.fm authentication coming soon!");
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--accent)]/10 transition-colors flex items-center gap-2"
+                    >
+                      <span>🎵</span> Connect Last.fm
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        toggleTheme();
+                        setIsProfileDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--accent)]/10 transition-colors flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{theme === "light" ? "🌙" : "☀️"}</span> Theme
+                      </div>
+                      <span className="text-xs text-[var(--text-secondary)] capitalize">{theme}</span>
+                    </button>
+
+                    {user?.role === "admin" && (
+                      <button
+                        onClick={() => {
+                          setIsProfileDropdownOpen(false);
+                          if (onToggleSection) onToggleSection('admin');
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--accent)]/10 transition-colors flex items-center gap-2 font-bold"
+                      >
+                        <span>🛠️</span> Admin Panel
+                      </button>
+                    )}
+
+                    <div className="border-t border-[var(--accent)]/10 mt-1 pt-1">
+                      <button
+                        onClick={() => {
+                          setIsProfileDropdownOpen(false);
+                          logout();
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-500/10 transition-colors flex items-center gap-2 font-bold"
+                      >
+                        <span>🚪</span> Logout
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right Section - Mobile Hamburger */}
@@ -128,10 +217,158 @@ function Header({ onToggleSection }) {
               >
                 Support
               </button>
+
+              {/* Mobile Profile Actions (if logged in) */}
+              {user && (
+                <div className="w-full max-w-xs space-y-2 border-t border-[var(--accent)]/20 pt-4 mt-2">
+                  <p className="text-center text-sm font-bold text-[var(--text-secondary)] mb-2">Profile Options</p>
+                  
+                  <button
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setIsProfilePicModalOpen(true);
+                    }}
+                    className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all flex items-center justify-center gap-2"
+                  >
+                    <span>📸</span> Change Avatar
+                  </button>
+
+                  {user?.role === "admin" && (
+                    <button
+                      onClick={() => {
+                        setIsMenuOpen(false);
+                        if (onToggleSection) onToggleSection('admin');
+                      }}
+                      className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 hover:bg-[var(--accent)]/20 transition-all flex items-center justify-center gap-2"
+                    >
+                      <span>🛠️</span> Admin Panel
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      alert("Last.fm authentication coming soon!");
+                    }}
+                    className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all flex items-center justify-center gap-2"
+                  >
+                    <span>🎵</span> Connect Last.fm
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      logout();
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-all"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
       </header>
+
+      {/* Add ProfilePic Modal inline for now or create a separate component. Doing inline for simplicity using existing modal styles. */}
+      {isProfilePicModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm text-[var(--text-primary)]">
+          <div className="bg-[var(--card-bg)] border border-[var(--accent)]/50 p-6 rounded-2xl shadow-2xl w-full max-w-sm relative">
+            <h2 className="text-xl font-bold mb-4 text-center text-[var(--accent)]">Update Profile Picture</h2>
+            
+            <div className="mb-6 flex flex-col items-center">
+              <div className="w-24 h-24 rounded-full bg-[var(--accent)]/10 border-2 border-[var(--accent)]/50 overflow-hidden mb-2 relative group">
+                {previewUrl || user.profilePicture ? (
+                  <img src={previewUrl || user.profilePicture} alt="Preview" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-[var(--accent)]/30">
+                    {getInitials(user.username || user.email)}
+                  </div>
+                )}
+                {loading && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    </div>
+                )}
+              </div>
+              <p className="text-xs text-[var(--text-secondary)]">Preview</p>
+            </div>
+
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              const fileInput = e.target.elements.avatarFile;
+              const file = fileInput.files[0];
+              if (!file && !previewUrl) return;
+
+              const finalImage = previewUrl || (file ? await new Promise(resolve => {
+                const r = new FileReader();
+                r.onloadend = () => resolve(r.result);
+                r.readAsDataURL(file);
+              }) : null);
+
+              if (!finalImage) return;
+
+              // Let the UI know it's saving
+              const submitBtn = e.target.elements.saveBtn;
+              if (submitBtn) submitBtn.disabled = true;
+              setLoading(true);
+
+              try {
+                const res = await fetch("/api/auth/profile-picture", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                  body: JSON.stringify({ userId: user.id, profilePicture: finalImage })
+                });
+                if (res.ok) {
+                  const { updatedUser } = await res.json();
+                  updateUser(updatedUser);
+                  setIsProfilePicModalOpen(false);
+                  setPreviewUrl(null);
+                }
+              } catch (err) {
+                console.error(err);
+              } finally {
+                if (submitBtn) submitBtn.disabled = false;
+                setLoading(false);
+              }
+            }} className="space-y-4">
+              <label className="block w-full px-4 py-6 text-center cursor-pointer rounded-xl bg-[var(--bg-primary)]/50 border border-dashed border-[var(--accent)]/50 focus-within:border-[var(--accent)] hover:bg-[var(--accent)]/5 transition-colors">
+                <span className="text-sm font-bold text-[var(--accent)] break-words">
+                  {previewUrl ? "Change selected image" : "Click to browse your device"}
+                </span>
+                <p className="text-xs text-[var(--text-secondary)] mt-1">Recommended: Square format, Max 2MB</p>
+                <input 
+                  name="avatarFile"
+                  type="file" 
+                  accept="image/*"
+                  required={!previewUrl}
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      if (file.size > 2 * 1024 * 1024) {
+                        alert("Image size should be less than 2MB to ensure fast loading.");
+                        e.target.value = "";
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setPreviewUrl(reader.result);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                />
+              </label>
+              <div className="flex gap-3">
+                <button type="button" onClick={() => { setIsProfilePicModalOpen(false); setPreviewUrl(null); }} className="flex-1 py-2 border border-[var(--accent)]/30 rounded-xl hover:bg-[var(--accent)]/10">Cancel</button>
+                <button name="saveBtn" type="submit" className="flex-1 py-2 bg-[var(--accent)] text-white rounded-xl shadow-lg hover:opacity-80 disabled:opacity-50">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       <HelpDeskModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
     </>
