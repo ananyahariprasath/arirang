@@ -217,7 +217,7 @@ function AuthModal({ isOpen, onClose }) {
               {loading ? "Verifying..." : "Verify OTP"}
             </button>
             <div className="text-center mt-4">
-              <button type="button" onClick={() => { setMode("forgot"); setError(""); }} className="text-[var(--text-secondary)] text-sm hover:underline">Resend OTP / Back</button>
+              <button type="button" onClick={() => { setMode("forgot"); setError(""); }} className="text-[var(--text-secondary)] text-sm hover:underline">Resend OTP</button>
             </div>
           </form>
         );

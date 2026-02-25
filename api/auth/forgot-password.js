@@ -44,34 +44,39 @@ export default async function handler(req, res) {
       { $set: { resetOtp: otp, resetOtpExpiry: otpExpiry } }
     );
 
-    // Send Email
+    // Send Email - Dynamic Configuration
     let transporter;
-    if (process.env.SMTP_USER && process.env.SMTP_USER.includes("ethereal.email")) {
-      // Automatic detection for Ethereal (dummy email service)
-      transporter = nodemailer.createTransport({
-        host: "smtp.ethereal.email",
-        port: 587,
-        secure: false, // true for 465, false for other ports
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
+    const smtpConfig = {
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    };
+
+    if (process.env.SMTP_HOST) {
+      // Explicit Host (Production or Custom SMTP)
+      smtpConfig.host = process.env.SMTP_HOST;
+      smtpConfig.port = parseInt(process.env.SMTP_PORT) || 587;
+      smtpConfig.secure = process.env.SMTP_SECURE === "true" || smtpConfig.port === 465;
+    } else if (process.env.SMTP_SERVICE) {
+      // Specific Service (e.g. "gmail", "sendgrid")
+      smtpConfig.service = process.env.SMTP_SERVICE;
+    } else if (process.env.SMTP_USER && process.env.SMTP_USER.includes("ethereal.email")) {
+      // Local Development Auto-detection for Ethereal
+      smtpConfig.host = "smtp.ethereal.email";
+      smtpConfig.port = 587;
+      smtpConfig.secure = false;
     } else {
-      // Standard service based config (defaults to gmail)
-      transporter = nodemailer.createTransport({
-        service: process.env.SMTP_SERVICE || "gmail",
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      });
+      // Default fallback (Gmail is common for hobby projects)
+      smtpConfig.service = "gmail";
     }
 
+    transporter = nodemailer.createTransport(smtpConfig);
+
     const mailOptions = {
-      from: process.env.SMTP_USER,
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to: email,
-      subject: "Arirang Spotify Takeove OTP Verification",
+      subject: "Arirang Spotify Takeover OTP Verification",
       text: `Your OTP for password reset is: ${otp}. It is valid for 2 minutes.`,
       html: `<p>Your OTP for password reset is: <b>${otp}</b></p><p>It is valid for 2 minutes.</p>`,
     };
