@@ -22,6 +22,32 @@ function toAction(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function extractBearerToken(req) {
+  const authHeader = req.headers.authorization || "";
+  if (!authHeader.startsWith("Bearer ")) return null;
+  return authHeader.slice("Bearer ".length).trim();
+}
+
+function verifyAdminRequest(req, res) {
+  const token = extractBearerToken(req);
+  if (!token) {
+    res.status(401).json({ error: "Unauthorized" });
+    return null;
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded?.role !== "admin") {
+      res.status(403).json({ error: "Forbidden" });
+      return null;
+    }
+    return decoded;
+  } catch {
+    res.status(401).json({ error: "Invalid token" });
+    return null;
+  }
+}
+
 function generateSignature(params, secret) {
   const sortedKeys = Object.keys(params).sort();
   let signature = "";
@@ -670,6 +696,38 @@ async function handleLastfmBattleStats(req, res) {
   });
 }
 
+async function handleUsersSummary(req, res) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const admin = verifyAdminRequest(req, res);
+  if (!admin) return;
+
+  const db = await getDb();
+  const usersCollection = db.collection("users");
+
+  const users = await usersCollection
+    .find({})
+    .project({ _id: 0, role: 1, lastfmUsername: 1 })
+    .toArray();
+
+  const regularUsers = users.filter((u) => (u.role || "user") !== "admin");
+  const connectedCount = regularUsers.filter((u) => String(u.lastfmUsername || "").trim().length > 0).length;
+  const totalUsers = regularUsers.length;
+  const notConnectedCount = Math.max(0, totalUsers - connectedCount);
+
+  return res.status(200).json({
+    success: true,
+    counts: {
+      signups: totalUsers,
+      lastfmConnected: connectedCount,
+      lastfmNotConnected: notConnectedCount,
+    },
+    generatedAt: new Date().toISOString(),
+  });
+}
+
 export default async function handler(req, res) {
   setCors(res);
 
@@ -697,6 +755,8 @@ export default async function handler(req, res) {
         return await handleLastfmSession(req, res);
       case "lastfm-battle-stats":
         return await handleLastfmBattleStats(req, res);
+      case "users-summary":
+        return await handleUsersSummary(req, res);
       default:
         return res.status(404).json({ error: "Not found" });
     }

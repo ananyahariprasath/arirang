@@ -30,17 +30,20 @@ function CountryModal({ selectedCountry, onClose, onSubmitProof }) {
   const currentPlaylists = (data.playlists || FOCUS_PLAYLISTS)[activePlatform === "spotify" ? "spotify" : "appleMusic"] || [];
 
   return (
-    <div className="fixed inset-0 z-[100] flex justify-center items-start md:items-center bg-black/40 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex justify-center items-start md:items-center bg-black/40 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200" onClick={onClose}>
       
       {/* Container */}
-      <div className="bg-[var(--card-bg)]
+      <div 
+        className="bg-[var(--card-bg)]
                       backdrop-blur-xl
                       border border-[var(--accent)]/30
                       text-[var(--text-primary)]
                       w-full max-w-2xl
                       rounded-3xl p-6 md:p-8 shadow-2xl relative
                       my-auto
-                      animate-in zoom-in-95 duration-200">
+                      animate-in zoom-in-95 duration-200"
+        onClick={(e) => e.stopPropagation()}
+      >
 
         {/* Close Button */}
         <button
@@ -111,7 +114,7 @@ function CountryModal({ selectedCountry, onClose, onSubmitProof }) {
         </div>
 
         {/* Playlist Grid - Scrollable with fixed height for 20 items */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8 max-h-[340px] overflow-y-auto pr-2 custom-scrollbar">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8 max-h-[340px] overflow-y-auto pr-2 no-scrollbar">
           {currentPlaylists.map((pl, idx) => (
             <a
               key={idx}
@@ -119,7 +122,7 @@ function CountryModal({ selectedCountry, onClose, onSubmitProof }) {
               target="_blank"
               rel="noopener noreferrer"
               className={`group bg-[var(--bg-secondary)]/30 border border-[var(--accent)]/10 hover:border-transparent 
-                         rounded-xl p-4 flex items-center justify-between transition-all duration-500 hover:scale-[1.02] active:scale-[0.98]
+                         rounded-xl p-4 flex items-center justify-between transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]
                          ${activePlatform === "spotify" ? "hover:bg-[#1DB954] hover:shadow-lg hover:shadow-[#1DB954]/20" : "hover:bg-[#FA2D48] hover:shadow-lg hover:shadow-[#FA2D48]/20"}`}
             >
               <div className="flex flex-col">

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import HelpDeskModal from "../components/modals/HelpDeskModal";
+import AuthLogo from "../components/branding/AuthLogo";
 import { COUNTRIES, COUNTRY_REGION_MAP } from "../constants";
 
 function AuthPage() {
@@ -319,7 +320,7 @@ function AuthPage() {
       <div className="z-10 w-full max-w-sm flex flex-col items-center">
         {/* Logo / Branding */}
         <div className="mb-8 flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <img src="/logo.svg" alt="ARIRANG Logo" className="w-24 h-24 mb-4 object-contain shadow-2xl rounded-full" />
+          <AuthLogo />
           <h1 className="text-3xl font-black tracking-widest uppercase text-[var(--accent)] text-center">
             ARIRANG
           </h1>

@@ -6,6 +6,7 @@ import useRegionalData from "../hooks/useRegionalData";
 import useModStatus from "../hooks/useModStatus";
 import useGalleryData from "../hooks/useGalleryData";
 import { useToast } from "../context/ToastContext";
+import { useAuth } from "../context/AuthContext";
 import { COUNTRY_PRESETS, COUNTRY_REGION_MAP, COUNTRIES, COUNTRY_TZ_MAP, FOCUS_PLAYLISTS } from "../constants";
 
 const allRegions = [...new Set(Object.values(COUNTRY_REGION_MAP))];
@@ -283,12 +284,16 @@ function AdminPanel() {
   const [tickets, setTickets] = useState([]);
   const [ticketsLoading, setTicketsLoading] = useState(true);
   const [ticketsError, setTicketsError] = useState("");
+  const [userSummary, setUserSummary] = useState({ signups: 0, lastfmConnected: 0, lastfmNotConnected: 0 });
+  const [userSummaryLoading, setUserSummaryLoading] = useState(true);
+  const [userSummaryError, setUserSummaryError] = useState("");
   const { battles, liveBattles, addBattle, updateBattle, updateLiveBattles, deleteBattle, clearBattles, resetLiveBattles, loading: battlesLoading } = useBattles();
   const { events, addEvent, updateEvent, deleteEvent, clearTimeline, resetToDefault, loading: timelineLoading } = useTimeline();
   const { regions, addRegion, deleteRegion, resetRegions, loading: regionsLoading } = useRegionalData();
   const { mods, toggleStatus, updateModDetails, resetMods, loading: modsLoading } = useModStatus();
   const { galleryImages, loading: galleryLoading, resetGallery, addGalleryImage, deleteGalleryImage, updateGalleryImage } = useGalleryData();
   const toast = useToast();
+  const { token } = useAuth();
 
   const isDataLoading = regionsLoading || modsLoading || battlesLoading || timelineLoading || galleryLoading;
   
@@ -370,6 +375,41 @@ function AdminPanel() {
       clearInterval(intervalId);
     };
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== "tickets") return;
+
+    let active = true;
+
+    const loadUserSummary = async () => {
+      setUserSummaryLoading(true);
+      setUserSummaryError("");
+      try {
+        const response = await fetch("/api/auth/users-summary", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load user summary");
+        }
+
+        if (active) {
+          setUserSummary(data.counts || { signups: 0, lastfmConnected: 0, lastfmNotConnected: 0 });
+        }
+      } catch (error) {
+        if (active) setUserSummaryError(error.message || "Failed to load user summary");
+      } finally {
+        if (active) setUserSummaryLoading(false);
+      }
+    };
+
+    loadUserSummary();
+    const intervalId = setInterval(loadUserSummary, 60000);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [activeTab, token]);
 
   const handleClearAllTickets = async () => {
     if (confirm("Are you sure you want to clear all tickets? This cannot be undone.")) {
@@ -585,6 +625,28 @@ function AdminPanel() {
                 </button>
               )}
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+              <div className="bg-[var(--card-bg)]/50 border border-[var(--accent)]/20 rounded-2xl p-4">
+                <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Total Signups</p>
+                <p className="text-2xl font-black text-[var(--accent)] mt-1">{userSummary.signups.toLocaleString()}</p>
+              </div>
+              <div className="bg-[var(--card-bg)]/50 border border-[var(--accent)]/20 rounded-2xl p-4">
+                <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Online (Last.fm Connected)</p>
+                <p className="text-2xl font-black text-emerald-400 mt-1">{userSummary.lastfmConnected.toLocaleString()}</p>
+              </div>
+              <div className="bg-[var(--card-bg)]/50 border border-[var(--accent)]/20 rounded-2xl p-4">
+                <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Offline (No Last.fm)</p>
+                <p className="text-2xl font-black text-rose-400 mt-1">{userSummary.lastfmNotConnected.toLocaleString()}</p>
+              </div>
+            </div>
+
+            {userSummaryLoading && (
+              <div className="mb-4 text-xs font-bold text-[var(--text-secondary)]">Loading participant counts...</div>
+            )}
+            {userSummaryError && (
+              <div className="mb-4 text-xs font-bold text-red-400">{userSummaryError}</div>
+            )}
 
             {ticketsLoading && (
               <div className="mb-6 text-sm font-bold text-[var(--text-secondary)]">Loading support tickets...</div>

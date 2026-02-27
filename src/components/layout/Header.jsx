@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
 import HelpDeskModal from "../modals/HelpDeskModal";
 import ConfirmModal from "../modals/ConfirmModal";
+import HeaderLogo from "../branding/HeaderLogo";
 
 
 function IconCamera({ className = "w-4 h-4" }) {
@@ -81,6 +82,23 @@ function Header({ onToggleSection }) {
   const [loading, setLoading] = useState(false);
   const [isConfirmDisconnectOpen, setIsConfirmDisconnectOpen] = useState(false);
 
+  const profileRef = useRef(null);
+  const mobileMenuRef = useRef(null);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setIsProfileDropdownOpen(false);
+      }
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Generate initials for avatar fallback
   const getInitials = (name) => {
@@ -94,12 +112,8 @@ function Header({ onToggleSection }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 md:py-2.5 relative flex items-center justify-between">
 
           {/* Left: Logo */}
-          <div className="flex-shrink-0">
-            <img
-              src="/logo.svg"
-              alt="Logo"
-              className="w-10 h-10 md:w-12 md:h-12 object-contain"
-            />
+          <div className="flex-shrink-0 h-10 md:h-12 flex items-center">
+            <HeaderLogo />
           </div>
 
           {/* Center: Website Name */}
@@ -124,7 +138,7 @@ function Header({ onToggleSection }) {
             </button>
 
             {user && (
-              <div className="relative">
+              <div className="relative" ref={profileRef}>
                 <button
                   onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
                   className="w-10 h-10 rounded-full bg-[var(--accent)] text-white flex items-center justify-center font-bold overflow-hidden border-2 border-[var(--accent)]/50 hover:border-[var(--accent)] transition-colors focus:outline-none"
@@ -230,7 +244,7 @@ function Header({ onToggleSection }) {
           </div>
 
           {/* Right Section - Mobile Hamburger */}
-          <div className="md:hidden flex items-center">
+          <div className="md:hidden flex items-center" ref={mobileMenuRef}>
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="p-2 text-[var(--text-primary)] focus:outline-none"
@@ -245,126 +259,126 @@ function Header({ onToggleSection }) {
                 </svg>
               )}
             </button>
+
+            {/* Mobile Menu Dropdown */}
+            {isMenuOpen && (
+              <div className="absolute top-full right-0 w-64 bg-[var(--bg-primary)]/95 backdrop-blur-xl border border-[var(--accent)]/30 rounded-bl-3xl shadow-2xl animate-in fade-in slide-in-from-top-5 duration-200 z-50">
+                <div className="px-4 py-6 space-y-4 flex flex-col items-stretch">
+                  
+                  {/* Mobile Toggle Switch */}
+                  <div className="flex items-center justify-between px-2">
+                    <span className="text-xs font-black uppercase tracking-widest opacity-60">Theme</span>
+                    <button
+                      onClick={toggleTheme}
+                      className="relative w-12 h-6 flex items-center rounded-full bg-[var(--accent)] transition-colors duration-300 flex-shrink-0"
+                    >
+                      <span
+                        className={`absolute left-1 top-1 w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-300 flex items-center justify-center text-[10px]
+                        ${theme === "dark" ? "translate-x-6" : ""}
+                      `}
+                      >
+                        {theme === "light" ? <IconSun className="w-3 h-3 text-amber-500" /> : <IconMoon className="w-3 h-3 text-slate-700" />}
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Mobile Recent Battles Button */}
+                  <button
+                    onClick={() => {
+                      if (onToggleSection) onToggleSection('recent-battles');
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full px-5 py-3 text-[10px] font-black rounded-xl
+                     bg-[var(--card-bg)]/60 
+                     border border-[var(--accent)]/40
+                     hover:bg-[var(--accent)]/10
+                     transition-all duration-300 tracking-widest uppercase"
+                  >
+                    Recent Battles
+                  </button>
+
+                  {/* Mobile Support Button */}
+                  <button
+                    onClick={() => {
+                      if (onToggleSection) onToggleSection('contact');
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full px-5 py-3 text-[10px] font-black rounded-xl
+                     bg-[var(--card-bg)]/60 
+                     border border-[var(--accent)]/40
+                     hover:bg-[var(--accent)]/10
+                     transition-all duration-300 tracking-widest uppercase"
+                  >
+                    Support
+                  </button>
+
+                  {/* Mobile Profile Actions (if logged in) */}
+                  {user && (
+                    <div className="space-y-2 border-t border-[var(--accent)]/20 pt-4 mt-2">
+                      <p className="text-center text-[9px] font-black uppercase tracking-[0.2em] opacity-40 mb-3">Account</p>
+                      
+                      <button
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          setIsProfilePicModalOpen(true);
+                        }}
+                        className="w-full px-5 py-3 text-[10px] font-black rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all flex items-center justify-center gap-2 tracking-widest uppercase"
+                      >
+                        <IconCamera /> Profile Pic
+                      </button>
+
+                      {user?.role === "admin" && (
+                        <button
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            if (onToggleSection) onToggleSection('admin');
+                          }}
+                          className="w-full px-5 py-3 text-[10px] font-black rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 hover:bg-[var(--accent)]/20 transition-all flex items-center justify-center gap-2 tracking-widest uppercase"
+                        >
+                          <IconTools /> Admin Panel
+                        </button>
+                      )}
+
+                      {user.lastfmUsername ? (
+                        <button
+                          onClick={() => {
+                            setIsConfirmDisconnectOpen(true);
+                            setIsMenuOpen(false);
+                          }}
+                          className="w-full px-5 py-3 text-[10px] font-black rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-all flex items-center justify-center gap-2 tracking-widest uppercase"
+                        >
+                          <IconDisconnect /> Disconnect LF
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            const apiKey = "464d8861f37218838766eef3f52b0bb0";
+                            const cb = window.location.origin;
+                            window.location.href = `https://www.last.fm/api/auth/?api_key=${apiKey}&cb=${cb}`;
+                          }}
+                          className="w-full px-5 py-3 text-[10px] font-black rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all flex items-center justify-center gap-2 tracking-widest uppercase"
+                        >
+                          <IconMusic /> Connect Last.fm
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          logout();
+                          setIsMenuOpen(false);
+                        }}
+                        className="w-full px-5 py-3 text-[10px] font-black rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-all flex items-center justify-center gap-2 tracking-widest uppercase"
+                      >
+                        <IconLogout /> Logout
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Mobile Menu Dropdown */}
-        {isMenuOpen && (
-          <div className="md:hidden absolute top-full left-0 w-full bg-[var(--bg-primary)]/95 backdrop-blur-xl border-b border-[var(--accent)] shadow-lg animate-in fade-in slide-in-from-top-5 duration-200">
-            <div className="px-4 py-4 space-y-4 flex flex-col items-center">
-              
-              {/* Mobile Toggle Switch */}
-              <div className="flex items-center justify-between w-full max-w-xs px-4">
-                <span className="text-sm font-medium">Theme</span>
-                <button
-                  onClick={toggleTheme}
-                  className="relative w-12 h-6 flex items-center rounded-full bg-[var(--accent)] transition-colors duration-300 flex-shrink-0"
-                >
-                  <span
-                    className={`absolute left-1 top-1 w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-300 flex items-center justify-center text-[10px]
-                    ${theme === "dark" ? "translate-x-6" : ""}
-                  `}
-                  >
-                    {theme === "light" ? <IconSun className="w-3 h-3 text-amber-500" /> : <IconMoon className="w-3 h-3 text-slate-700" />}
-                  </span>
-                </button>
-              </div>
-
-              {/* Mobile Recent Battles Button */}
-              <button
-                onClick={() => {
-                  if (onToggleSection) onToggleSection('recent-battles');
-                  setIsMenuOpen(false);
-                }}
-                className="w-full max-w-xs px-5 py-3 text-sm font-bold rounded-xl
-                 bg-[var(--card-bg)]/60 
-                 border border-[var(--accent)]/40
-                 hover:bg-[var(--accent)]/10
-                 transition-all duration-300 tracking-widest uppercase"
-              >
-                Recent Battles
-              </button>
-
-              {/* Mobile Support Button */}
-              <button
-                onClick={() => {
-                  if (onToggleSection) onToggleSection('contact');
-                  setIsMenuOpen(false);
-                }}
-                className="w-full max-w-xs px-5 py-3 text-sm font-bold rounded-xl
-                 bg-[var(--card-bg)]/60 
-                 border border-[var(--accent)]/40
-                 hover:bg-[var(--accent)]/10
-                 transition-all duration-300 tracking-widest uppercase"
-              >
-                Support
-              </button>
-
-              {/* Mobile Profile Actions (if logged in) */}
-              {user && (
-                <div className="w-full max-w-xs space-y-2 border-t border-[var(--accent)]/20 pt-4 mt-2">
-                  <p className="text-center text-sm font-bold text-[var(--text-secondary)] mb-2">Profile Options</p>
-                  
-                  <button
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      setIsProfilePicModalOpen(true);
-                    }}
-                    className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all flex items-center justify-center gap-2"
-                  >
-                    <IconCamera /> Change Avatar
-                  </button>
-
-                  {user?.role === "admin" && (
-                    <button
-                      onClick={() => {
-                        setIsMenuOpen(false);
-                        if (onToggleSection) onToggleSection('admin');
-                      }}
-                      className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 hover:bg-[var(--accent)]/20 transition-all flex items-center justify-center gap-2"
-                    >
-                      <IconTools /> Admin Panel
-                    </button>
-                  )}
-
-                  {user.lastfmUsername ? (
-                    <button
-                      onClick={() => {
-                        setIsConfirmDisconnectOpen(true);
-                        setIsMenuOpen(false);
-                      }}
-                      className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-all flex items-center justify-center gap-2"
-                    >
-                      <IconDisconnect /> Disconnect Last.fm ({user.lastfmUsername})
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setIsMenuOpen(false);
-                        const apiKey = "464d8861f37218838766eef3f52b0bb0";
-                        const cb = window.location.origin;
-                        window.location.href = `https://www.last.fm/api/auth/?api_key=${apiKey}&cb=${cb}`;
-                      }}
-                      className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all flex items-center justify-center gap-2"
-                    >
-                      <IconMusic /> Connect Last.fm
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => {
-                      logout();
-                      setIsMenuOpen(false);
-                    }}
-                    className="w-full px-5 py-3 text-sm font-bold rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-all flex items-center justify-center gap-2"
-                  >
-                    <IconLogout /> Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </header>
 
       {/* Add ProfilePic Modal inline for now or create a separate component. Doing inline for simplicity using existing modal styles. */}

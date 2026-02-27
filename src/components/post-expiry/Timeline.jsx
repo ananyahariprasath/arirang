@@ -3,6 +3,45 @@ import useTimeline from "../../hooks/useTimeline";
 function Timeline() {
   const { events } = useTimeline();
 
+  const renderEventText = (text) => {
+    const lines = String(text || "").split(/\r?\n/);
+
+    return (
+      <div className="space-y-0.5">
+        {lines.map((line, idx) => {
+          const trimmed = line.trim();
+          if (!trimmed) {
+            return <div key={`spacer-${idx}`} className="h-2" />;
+          }
+
+          const numbered = trimmed.match(/^(\d+)\.\s*(.+)$/);
+          if (numbered) {
+            return (
+              <div key={`num-${idx}`} className="grid grid-cols-[1.25rem_1fr] gap-2 items-start text-xs md:text-sm font-bold leading-4 md:leading-5 opacity-90">
+                <span className="tabular-nums text-right">{numbered[1]}.</span>
+                <span className="break-words tracking-[0.01em]">{numbered[2]}</span>
+              </div>
+            );
+          }
+
+          const isSectionHeader = trimmed.endsWith(":");
+          return (
+            <p
+              key={`line-${idx}`}
+              className={`text-xs md:text-sm break-words tracking-[0.01em] ${
+                isSectionHeader
+                  ? "font-black leading-4 md:leading-5 mt-1"
+                  : "font-bold leading-4 md:leading-5 opacity-90"
+              }`}
+            >
+              {trimmed}
+            </p>
+          );
+        })}
+      </div>
+    );
+  };
+
   // Helper to color markers based on platform
   const getPlatformStyle = (platform) => {
     const p = platform.toLowerCase();
@@ -61,7 +100,9 @@ function Timeline() {
                   
                   <div className="bg-[var(--accent)]/5 border border-[var(--accent)]/10 rounded-xl p-3 px-4 transition-all group-hover:bg-[var(--accent)]/10 group-hover:border-[var(--accent)]/30 group-hover:-translate-y-0.5">
                     <div className="flex justify-between items-start gap-4">
-                      <p className="text-xs md:text-sm font-bold leading-tight opacity-90 whitespace-pre-line">{ev.event}</p>
+                      <div className="flex-1 min-w-0">
+                        {renderEventText(ev.event)}
+                      </div>
                       <span className="text-[8px] px-1.5 py-0.5 bg-[var(--accent)]/10 text-[var(--accent)] rounded font-black uppercase tracking-widest whitespace-nowrap">
                         {ev.platform}
                       </span>

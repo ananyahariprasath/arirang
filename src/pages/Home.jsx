@@ -20,10 +20,35 @@ import PreSaveQR from "../components/section-1/PreSaveQR";
 import CountdownTimer from "../components/section-1/CountdownTimer";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
+import { COUNTRIES } from "../constants";
 
+const COUNTRY_PLACEHOLDER = "Select your Country";
+
+const COUNTRY_ALIASES = {
+  "united states": "USA",
+  "united states of america": "USA",
+  us: "USA",
+  "u.s.": "USA",
+  "u.s.a.": "USA",
+};
+
+function resolveCountryFromUser(user) {
+  const raw = String(user?.country || "").trim();
+  if (!raw) return null;
+
+  const exact = COUNTRIES.find((c) => c === raw);
+  if (exact) return exact;
+
+  const normalized = raw.toLowerCase();
+  const alias = COUNTRY_ALIASES[normalized];
+  if (alias && COUNTRIES.includes(alias)) return alias;
+
+  const caseInsensitive = COUNTRIES.find((c) => c.toLowerCase() === normalized);
+  return caseInsensitive || null;
+}
 
 function Home({ onNavigateToProof, onOpenAdmin }) {
-  const [selectedCountry, setSelectedCountry] = useState("Select your Country");
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRY_PLACEHOLDER);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRecentBattlesOpen, setIsRecentBattlesOpen] = useState(false);
   const [isContactOpen, setIsContactOpen] = useState(false);
@@ -85,6 +110,22 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
   const { user, updateUser } = useAuth();
   const toast = useToast();
 
+  useEffect(() => {
+    if (!user) {
+      setSelectedCountry(COUNTRY_PLACEHOLDER);
+      return;
+    }
+
+    const defaultCountry = resolveCountryFromUser(user);
+    if (defaultCountry) {
+      setSelectedCountry((prev) => (
+        prev === COUNTRY_PLACEHOLDER ? defaultCountry : prev
+      ));
+    } else {
+      setSelectedCountry(COUNTRY_PLACEHOLDER);
+    }
+  }, [user?.id, user?.country]);
+
   // Handle Last.fm Callback
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -133,7 +174,6 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setSelectedCountry("Select your Country");
   };
 
   const handleToggleSection = (section) => {

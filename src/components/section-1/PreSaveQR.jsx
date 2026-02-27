@@ -1,22 +1,24 @@
 import { PRESAVE_LINKS } from "../../constants";
 
 function PreSaveQR() {
-  const qrBaseUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=";
+  const qrBaseUrl = "https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=";
 
   return (
-    <div className="mt-1 w-full flex flex-row flex-nowrap items-center justify-center gap-3 sm:gap-4 bg-[var(--accent)]/5 rounded-xl p-1.5 sm:p-2 border border-[var(--accent)]/10">
+    <div className="mt-1 w-full flex flex-row flex-nowrap items-center justify-center gap-3 sm:gap-4 bg-[var(--accent)]/5 rounded-xl p-2 sm:p-3 border border-[var(--accent)]/10">
       {/* Left side: QR codes side-by-side */}
-      <div className="flex flex-row gap-1.5 shrink-0">
+      <div className="flex flex-row items-center gap-4 sm:gap-6 shrink-0">
         {/* Spotify QR */}
         <div className="group relative">
           <div className="bg-white/10 backdrop-blur-md p-1 rounded-lg border border-white/20 shadow-sm group-hover:scale-110 transition-transform duration-300">
             <img 
               src={`${qrBaseUrl}${encodeURIComponent(PRESAVE_LINKS.spotify)}`}
               alt="Spotify"
-              className="w-8 h-8 md:w-10 md:h-10 rounded-sm"
+              className="w-12 h-12 md:w-14 md:h-14 rounded-sm"
             />
           </div>
         </div>
+
+        <div className="h-10 md:h-12 w-px bg-[var(--accent)]/20" />
 
         {/* Apple Music QR */}
         <div className="group relative">
@@ -24,7 +26,7 @@ function PreSaveQR() {
             <img 
               src={`${qrBaseUrl}${encodeURIComponent(PRESAVE_LINKS.appleMusic)}`}
               alt="Apple Music"
-              className="w-8 h-8 md:w-10 md:h-10 rounded-sm"
+              className="w-12 h-12 md:w-14 md:h-14 rounded-sm"
             />
           </div>
         </div>

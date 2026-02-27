@@ -4,6 +4,7 @@ import { COUNTRIES } from "../../constants";
 function CountryDropdown({ selectedCountry, onSelect, disabled = false }) {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const hasValidSelection = COUNTRIES.includes(selectedCountry);
 
   const filteredCountries = COUNTRIES
     .filter((country) =>
@@ -14,13 +15,8 @@ function CountryDropdown({ selectedCountry, onSelect, disabled = false }) {
   return (
     <div className="w-full relative transition-all duration-500">
       <div className="w-full relative">
-
-        {/* Dropdown Button */}
-        <button
-          onClick={() => {
-            setOpen(!open);
-            setSearchTerm(""); // Reset search when opening/closing
-          }}
+        {/* Header Row */}
+        <div
           className={`w-full
            bg-[var(--card-bg)]/30
            backdrop-blur-2xl
@@ -32,23 +28,46 @@ function CountryDropdown({ selectedCountry, onSelect, disabled = false }) {
            transition-all duration-300
            hover:border-[var(--accent)] hover:bg-[var(--card-bg)]/40`}
         >
-          <span className="font-bold tracking-tight text-xs md:text-sm uppercase">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => {
+              if (hasValidSelection) {
+                onSelect(selectedCountry);
+                return;
+              }
+              setOpen(!open);
+              setSearchTerm("");
+            }}
+            className="flex-1 text-left font-bold tracking-tight text-xs md:text-sm uppercase"
+          >
             {selectedCountry}
-          </span>
-          <span className={`transition-transform duration-300 ${open ? "rotate-180" : ""}`}>
-            ▾
-          </span>
-        </button>
+          </button>
+
+          <button
+            type="button"
+            aria-label="Toggle country list"
+            disabled={disabled}
+            onClick={() => {
+              setOpen(!open);
+              setSearchTerm("");
+            }}
+            className={`ml-3 transition-transform duration-300 ${open ? "rotate-180" : ""}`}
+          >
+            v
+          </button>
+        </div>
 
         {/* Dropdown List */}
         {open && (
-           <div className="absolute w-full mt-2
+          <div
+            className="absolute w-full mt-2
            bg-[var(--card-bg)]
            backdrop-blur-3xl
            border border-[var(--accent)]/50
            rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.4)]
-           overflow-hidden z-50">
-
+           overflow-hidden z-50"
+          >
             {/* Search Input */}
             <div className="p-3 border-b border-[var(--accent)]/10 bg-[var(--bg-secondary)]/30">
               <input
@@ -61,7 +80,7 @@ function CountryDropdown({ selectedCountry, onSelect, disabled = false }) {
               />
             </div>
 
-            <div className="max-h-60 overflow-y-auto custom-scrollbar">
+            <div className="max-h-60 overflow-y-auto no-scrollbar">
               {filteredCountries.length > 0 ? (
                 filteredCountries.map((country) => (
                   <button
@@ -84,7 +103,6 @@ function CountryDropdown({ selectedCountry, onSelect, disabled = false }) {
                 </div>
               )}
             </div>
-
           </div>
         )}
       </div>
