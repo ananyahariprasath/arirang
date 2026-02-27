@@ -191,6 +191,44 @@ function Header({ onToggleSection }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
+    const hideGoogleTranslateBanner = () => {
+      const bannerFrames = document.querySelectorAll("iframe.goog-te-banner-frame, .goog-te-banner-frame");
+      bannerFrames.forEach((node) => {
+        if (node && node.style) {
+          node.style.display = "none";
+          node.style.visibility = "hidden";
+          node.style.height = "0px";
+          node.style.width = "0px";
+        }
+      });
+
+      const bannerContainers = document.querySelectorAll(".skiptranslate, .goog-te-banner-frame.skiptranslate");
+      bannerContainers.forEach((node) => {
+        if (node && node.style) {
+          node.style.display = "none";
+          node.style.visibility = "hidden";
+          node.style.height = "0px";
+        }
+      });
+
+      document.body.style.top = "0px";
+      document.documentElement.style.top = "0px";
+    };
+
+    hideGoogleTranslateBanner();
+    const intervalId = setInterval(hideGoogleTranslateBanner, 500);
+    const observer = new MutationObserver(() => hideGoogleTranslateBanner());
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+
+    return () => {
+      clearInterval(intervalId);
+      observer.disconnect();
+    };
+  }, []);
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
