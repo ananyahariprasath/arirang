@@ -436,6 +436,9 @@ function Header({ onToggleSection }) {
 
               {isTranslateOpen && (
                 <div className="absolute right-0 mt-2 w-56 max-h-72 overflow-y-auto no-scrollbar bg-[var(--card-bg)] border border-[var(--accent)]/30 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                  <p className="px-3 pb-2 text-[10px] leading-snug text-[var(--text-secondary)]/80 text-center">
+                    If you see &quot;No language found&quot;, please refresh the page and you&apos;ll be able to see them.
+                  </p>
                   <div className="px-3 pb-2 border-b border-[var(--accent)]/20">
                     <input
                       type="text"
@@ -510,6 +513,9 @@ function Header({ onToggleSection }) {
 
                   <div className="px-2">
                     <label className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1.5 block">Translate</label>
+                    <p className="text-[10px] leading-snug text-[var(--text-secondary)]/80 mb-2 text-center">
+                      If you see &quot;No language found&quot;, please refresh the page and you&apos;ll be able to see them.
+                    </p>
                     <input
                       type="text"
                       value={translateSearch}
