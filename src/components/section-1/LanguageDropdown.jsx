@@ -90,7 +90,7 @@ function LanguageDropdown() {
             />
           </div>
 
-          <div className="max-h-52 overflow-y-auto custom-scrollbar">
+          <div className="max-h-52 overflow-y-auto no-scrollbar">
             {filteredLanguages.length > 0 ? (
               filteredLanguages.map((lang) => (
                 <button

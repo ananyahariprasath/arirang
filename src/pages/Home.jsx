@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Header from "../components/layout/Header";
 import useCountdown from "../hooks/useCountdown";
 import { useTheme } from "../context/ThemeContext";
@@ -13,6 +13,7 @@ import RecentResultsDrawer from "../components/ui/RecentResultsDrawer";
 import VerticalTabs from "../components/ui/VerticalTabs";
 import Gallery from "../components/post-expiry/Gallery";
 import BattleWinnerModal from "../components/modals/BattleWinnerModal";
+import DailyUpdateModal from "../components/modals/DailyUpdateModal";
 import useBattles from "../hooks/useBattles";
 import YoutubeEmbed from "../components/section-1/YoutubeEmbed";
 import LanguageDropdown from "../components/section-1/LanguageDropdown";
@@ -21,6 +22,7 @@ import CountdownTimer from "../components/section-1/CountdownTimer";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { COUNTRIES } from "../constants";
+import useDailyUpdates from "../hooks/useDailyUpdates";
 
 const COUNTRY_PLACEHOLDER = "Select your Country";
 
@@ -53,6 +55,10 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
   const [isRecentBattlesOpen, setIsRecentBattlesOpen] = useState(false);
   const [isContactOpen, setIsContactOpen] = useState(false);
   const [isWinnerModalOpen, setIsWinnerModalOpen] = useState(false);
+  const [isDailyUpdateModalOpen, setIsDailyUpdateModalOpen] = useState(false);
+  const [queueWinnerAfterUpdate, setQueueWinnerAfterUpdate] = useState(false);
+  const [isPageReadyForPopups, setIsPageReadyForPopups] = useState(false);
+  const lastPopupKeyRef = useRef("");
   const { theme } = useTheme();
   const [resetCountdown, setResetCountdown] = useState("00:00:00");
 
@@ -78,6 +84,28 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
     updateTime();
     const localTimer = setInterval(updateTime, 1000);
     return () => clearInterval(localTimer);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const markReady = () => {
+      if (cancelled) return;
+      // Give layout one extra paint cycle after full load to avoid popup flicker/glitch.
+      setTimeout(() => {
+        if (!cancelled) setIsPageReadyForPopups(true);
+      }, 120);
+    };
+
+    if (document.readyState === "complete") {
+      markReady();
+    } else {
+      window.addEventListener("load", markReady, { once: true });
+    }
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("load", markReady);
+    };
   }, []);
 
   useEffect(() => {
@@ -107,8 +135,16 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
 
   const { isExpired } = useCountdown();
   const { battles, loading } = useBattles();
+  const { updates, latestUpdate, loading: dailyUpdatesLoading } = useDailyUpdates();
   const { user, updateUser } = useAuth();
   const toast = useToast();
+
+  const preferredWinnerBattles = useMemo(() => {
+    const all = Array.isArray(battles) ? battles : [];
+    const manualFirst = all.filter((b) => String(b?.source || "manual") !== "auto:lastfm");
+    return manualFirst.length > 0 ? manualFirst : all;
+  }, [battles]);
+  const hasWinnerRecords = preferredWinnerBattles.length > 0;
 
   useEffect(() => {
     if (!user) {
@@ -160,12 +196,37 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
     }
   }, [user, updateUser, toast]);
 
-  // Trigger Winner Modal on entry if there are previous results
+  // Show daily update first (if present and unseen), then preserve winner modal behavior.
   useEffect(() => {
-    if (isExpired) {
+    if (!isPageReadyForPopups || dailyUpdatesLoading) return;
+    const hasGlobalUpdate = Boolean(latestUpdate?.message);
+    const popupScopeKey = [
+      latestUpdate?.id || "",
+      latestUpdate?.updatedAt || "",
+      String(isExpired),
+      String(hasWinnerRecords),
+    ].join("|");
+    if (lastPopupKeyRef.current === popupScopeKey) return;
+    lastPopupKeyRef.current = popupScopeKey;
+
+    if (hasGlobalUpdate) {
+      setQueueWinnerAfterUpdate(Boolean(isExpired && hasWinnerRecords));
+      setIsDailyUpdateModalOpen(true);
+      return;
+    }
+
+    if (isExpired && hasWinnerRecords) {
       setIsWinnerModalOpen(true);
     }
-  }, [isExpired]);
+  }, [
+    isExpired,
+    hasWinnerRecords,
+    dailyUpdatesLoading,
+    latestUpdate?.id,
+    latestUpdate?.updatedAt,
+    latestUpdate?.message,
+    isPageReadyForPopups,
+  ]);
 
   const handleCountrySelect = (country) => {
     setSelectedCountry(country);
@@ -305,8 +366,22 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
 
       {isWinnerModalOpen && (
         <BattleWinnerModal 
-          winners={battles ? battles.slice(0, 4) : []} 
+          winners={preferredWinnerBattles.slice(0, 4)} 
           onClose={() => setIsWinnerModalOpen(false)} 
+        />
+      )}
+
+      {isDailyUpdateModalOpen && (
+        <DailyUpdateModal
+          update={latestUpdate}
+          updates={updates}
+          onClose={() => {
+            setIsDailyUpdateModalOpen(false);
+            if (queueWinnerAfterUpdate) {
+              setIsWinnerModalOpen(true);
+              setQueueWinnerAfterUpdate(false);
+            }
+          }}
         />
       )}
     </div>

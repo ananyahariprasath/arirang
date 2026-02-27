@@ -13,6 +13,8 @@ const MAX_BATTLES_PER_RUN = toPositiveInt(process.env.LASTFM_SYNC_MAX_BATTLES_PE
 const RECENT_TRACKS_LIMIT = toPositiveInt(process.env.LASTFM_SYNC_RECENT_LIMIT, 200);
 const MAX_RECENT_PAGES = toPositiveInt(process.env.LASTFM_SYNC_RECENT_MAX_PAGES, 3);
 const SNAPSHOT_GRACE_MINUTES = toPositiveInt(process.env.LASTFM_SNAPSHOT_GRACE_MINUTES, 30);
+const MAX_BATCHES_PER_RUN = toPositiveInt(process.env.LASTFM_SYNC_MAX_BATCHES_PER_RUN, 8);
+const NOW_PLAYING_COOLDOWN_SECONDS = toPositiveInt(process.env.LASTFM_NOW_PLAYING_COOLDOWN_SECONDS, 180);
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Credentials", "true");
@@ -26,7 +28,12 @@ function normalizeRegion(value = "") {
 }
 
 function normalizeTarget(value = "") {
-  return String(value).trim().toLowerCase();
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function toResetKeyUTC(now = new Date()) {
@@ -142,6 +149,9 @@ async function fetchAndCountUserScrobblesSince({
   let maxSeenUts = fromUts;
   let albumDelta = 0;
   let titleDelta = 0;
+  let nowPlayingSignature = "";
+  let nowPlayingAlbumMatch = false;
+  let nowPlayingTitleMatch = false;
   let ok = true;
 
   while (page <= MAX_RECENT_PAGES) {
@@ -174,16 +184,6 @@ async function fetchAndCountUserScrobblesSince({
 
     let pageHadEligible = false;
     for (const track of tracks) {
-      const utsRaw = track?.date?.uts;
-      if (!utsRaw) continue; // Skip now-playing entries.
-
-      const uts = Number.parseInt(String(utsRaw), 10);
-      if (!Number.isFinite(uts) || uts <= fromUts) continue;
-      if (Number.isFinite(toUts) && uts > toUts) continue;
-
-      pageHadEligible = true;
-      if (uts > maxSeenUts) maxSeenUts = uts;
-
       const artist = normalizeTarget(
         track?.artist?.["#text"] || track?.artist?.name || track?.artist || ""
       );
@@ -191,6 +191,24 @@ async function fetchAndCountUserScrobblesSince({
 
       const scrobbleTrack = normalizeTarget(track?.name || "");
       const scrobbleAlbum = normalizeTarget(track?.album?.["#text"] || track?.album || "");
+      const isNowPlaying = String(track?.["@attr"]?.nowplaying || "").toLowerCase() === "true";
+
+      if (isNowPlaying) {
+        nowPlayingSignature = `${artist}|${scrobbleAlbum}|${scrobbleTrack}`;
+        nowPlayingTitleMatch = scrobbleTrack === trackTarget;
+        nowPlayingAlbumMatch = scrobbleAlbum === albumTarget;
+        continue;
+      }
+
+      const utsRaw = track?.date?.uts;
+      if (!utsRaw) continue;
+
+      const uts = Number.parseInt(String(utsRaw), 10);
+      if (!Number.isFinite(uts) || uts <= fromUts) continue;
+      if (Number.isFinite(toUts) && uts > toUts) continue;
+
+      pageHadEligible = true;
+      if (uts > maxSeenUts) maxSeenUts = uts;
 
       if (scrobbleTrack === trackTarget) titleDelta += 1;
       if (scrobbleAlbum === albumTarget) albumDelta += 1;
@@ -206,7 +224,15 @@ async function fetchAndCountUserScrobblesSince({
     page += 1;
   }
 
-  return { ok, maxSeenUts, albumDelta, titleDelta };
+  return {
+    ok,
+    maxSeenUts,
+    albumDelta,
+    titleDelta,
+    nowPlayingSignature,
+    nowPlayingAlbumMatch,
+    nowPlayingTitleMatch,
+  };
 }
 
 async function mapWithConcurrency(items, limit, worker) {
@@ -263,6 +289,13 @@ async function ensureIndexes(db) {
   await db.collection("lastfm_snapshot_state").createIndex(
     { id: 1 },
     { unique: true }
+  );
+  await db.collection("lastfm_user_leaderboard").createIndex(
+    { resetKey: 1, userId: 1, battleId: 1, configKey: 1 },
+    { unique: true }
+  );
+  await db.collection("lastfm_user_leaderboard").createIndex(
+    { resetKey: 1, totalStreams: -1 }
   );
 }
 
@@ -399,6 +432,7 @@ async function processBattleBatch({ db, battle, apiKey, resetKey, toUts = null }
   const stateCollection = db.collection("lastfm_battle_sync_state");
   const userStateCollection = db.collection("lastfm_battle_user_state");
   const aggregateCollection = db.collection("lastfm_battle_aggregates");
+  const leaderboardCollection = db.collection("lastfm_user_leaderboard");
 
   const configKey = buildConfigKey(battle);
   const stateFilter = { battleId: battle.id, resetKey, configKey };
@@ -465,6 +499,19 @@ async function processBattleBatch({ db, battle, apiKey, resetKey, toUts = null }
       : counted.maxSeenUts;
     const nextUts = Math.max(fromUts, boundedMaxSeenUts);
     const now = new Date();
+    const nowPlayingPrevSig = String(previous?.lastNowPlayingSignature || "");
+    const nowPlayingPrevAt = Number.parseInt(String(previous?.lastNowPlayingCountedAtUts || "0"), 10);
+    const nowPlayingEligible =
+      Boolean(counted.nowPlayingSignature) &&
+      (
+        counted.nowPlayingSignature !== nowPlayingPrevSig ||
+        !Number.isFinite(nowPlayingPrevAt) ||
+        (nowUts - nowPlayingPrevAt) >= NOW_PLAYING_COOLDOWN_SECONDS
+      );
+    const nowPlayingAlbumDelta = nowPlayingEligible && counted.nowPlayingAlbumMatch ? 1 : 0;
+    const nowPlayingTitleDelta = nowPlayingEligible && counted.nowPlayingTitleMatch ? 1 : 0;
+    const totalAlbumDelta = counted.albumDelta + nowPlayingAlbumDelta;
+    const totalTitleDelta = counted.titleDelta + nowPlayingTitleDelta;
 
     if (!previous) {
       await userStateCollection.insertOne({
@@ -475,23 +522,34 @@ async function processBattleBatch({ db, battle, apiKey, resetKey, toUts = null }
         username,
         region: user.region,
         lastSyncedUts: nextUts,
+        lastNowPlayingSignature: counted.nowPlayingSignature || "",
+        lastNowPlayingCountedAtUts: nowPlayingEligible ? nowUts : 0,
         createdAt: now,
         updatedAt: now,
       });
       return {
         side,
-        albumDelta: counted.albumDelta,
-        trackDelta: counted.titleDelta,
+        albumDelta: totalAlbumDelta,
+        trackDelta: totalTitleDelta,
         firstSeen: true,
+        userId,
+        username,
+        region: user.region,
       };
     }
 
-    if (nextUts > fromUts) {
+    if (
+      nextUts > fromUts ||
+      counted.nowPlayingSignature !== nowPlayingPrevSig ||
+      nowPlayingEligible
+    ) {
       await userStateCollection.updateOne(
         userStateFilter,
         {
           $set: {
             lastSyncedUts: nextUts,
+            lastNowPlayingSignature: counted.nowPlayingSignature || nowPlayingPrevSig,
+            lastNowPlayingCountedAtUts: nowPlayingEligible ? nowUts : (Number.isFinite(nowPlayingPrevAt) ? nowPlayingPrevAt : 0),
             updatedAt: now,
           },
         }
@@ -500,9 +558,12 @@ async function processBattleBatch({ db, battle, apiKey, resetKey, toUts = null }
 
     return {
       side,
-      albumDelta: counted.albumDelta,
-      trackDelta: counted.titleDelta,
+      albumDelta: totalAlbumDelta,
+      trackDelta: totalTitleDelta,
       firstSeen: false,
+      userId,
+      username,
+      region: user.region,
     };
   });
 
@@ -511,6 +572,53 @@ async function processBattleBatch({ db, battle, apiKey, resetKey, toUts = null }
     increments[item.side].album += item.albumDelta;
     increments[item.side].title += item.trackDelta;
     if (item.firstSeen) increments[item.side].users += 1;
+  }
+
+  const leaderboardOps = [];
+  const now = new Date();
+  for (const item of processed) {
+    if (!item) continue;
+    const albumDelta = Number(item.albumDelta || 0);
+    const titleDelta = Number(item.trackDelta || 0);
+    const totalDelta = albumDelta + titleDelta;
+    if (totalDelta <= 0) continue;
+
+    leaderboardOps.push({
+      updateOne: {
+        filter: {
+          resetKey,
+          userId: String(item.userId),
+          battleId: String(battle.id),
+          configKey,
+        },
+        update: {
+          $set: {
+            resetKey,
+            userId: String(item.userId),
+            battleId: String(battle.id),
+            configKey,
+            lastfmUsername: String(item.username || ""),
+            region: String(item.region || ""),
+            updatedAt: now,
+          },
+          $setOnInsert: {
+            createdAt: now,
+            albumStreams: 0,
+            titleStreams: 0,
+            totalStreams: 0,
+          },
+          $inc: {
+            albumStreams: albumDelta,
+            titleStreams: titleDelta,
+            totalStreams: totalDelta,
+          },
+        },
+        upsert: true,
+      },
+    });
+  }
+  if (leaderboardOps.length > 0) {
+    await leaderboardCollection.bulkWrite(leaderboardOps, { ordered: false });
   }
 
   await aggregateCollection.updateOne(
@@ -581,6 +689,55 @@ async function processBattleBatch({ db, battle, apiKey, resetKey, toUts = null }
   };
 }
 
+async function processBattleForRun({
+  db,
+  battle,
+  apiKey,
+  resetKey,
+  toUts = null,
+}) {
+  const summaries = [];
+  for (let batch = 0; batch < MAX_BATCHES_PER_RUN; batch += 1) {
+    const result = await processBattleBatch({ db, battle, apiKey, resetKey, toUts });
+    summaries.push(result);
+    if (!result?.nextCursorId || result?.processedUsers < BATCH_SIZE) break;
+  }
+
+  const totals = summaries.reduce(
+    (acc, item) => {
+      if (!item) return acc;
+      acc.processedUsers += Number(item.processedUsers || 0);
+      acc.increments.sideA.album += Number(item?.increments?.sideA?.album || 0);
+      acc.increments.sideA.title += Number(item?.increments?.sideA?.title || 0);
+      acc.increments.sideA.users += Number(item?.increments?.sideA?.users || 0);
+      acc.increments.sideB.album += Number(item?.increments?.sideB?.album || 0);
+      acc.increments.sideB.title += Number(item?.increments?.sideB?.title || 0);
+      acc.increments.sideB.users += Number(item?.increments?.sideB?.users || 0);
+      acc.nextCursorId = item.nextCursorId ?? acc.nextCursorId;
+      acc.cycle = item.cycle ?? acc.cycle;
+      return acc;
+    },
+    {
+      processedUsers: 0,
+      nextCursorId: null,
+      cycle: 0,
+      increments: {
+        sideA: { album: 0, title: 0, users: 0 },
+        sideB: { album: 0, title: 0, users: 0 },
+      },
+    }
+  );
+
+  return {
+    battleId: battle.id,
+    processedUsers: totals.processedUsers,
+    nextCursorId: totals.nextCursorId,
+    cycle: totals.cycle,
+    increments: totals.increments,
+    batchesRun: summaries.length,
+  };
+}
+
 export default async function handler(req, res) {
   setCors(res);
 
@@ -619,7 +776,7 @@ export default async function handler(req, res) {
     const results = [];
     if (withinGraceWindow) {
       for (const battle of activeBattles) {
-        const previousResult = await processBattleBatch({
+        const previousResult = await processBattleForRun({
           db,
           battle,
           apiKey,
@@ -634,7 +791,7 @@ export default async function handler(req, res) {
     }
 
     for (const battle of activeBattles) {
-      const result = await processBattleBatch({
+      const result = await processBattleForRun({
         db,
         battle,
         apiKey,

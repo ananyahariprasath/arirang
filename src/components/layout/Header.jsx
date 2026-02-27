@@ -60,6 +60,17 @@ function IconTools({ className = "w-4 h-4" }) {
   );
 }
 
+function IconGlobe({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20" />
+      <path d="M12 2a15 15 0 0 1 0 20" />
+      <path d="M12 2a15 15 0 0 0 0 20" />
+    </svg>
+  );
+}
+
 function IconLogout({ className = "w-4 h-4" }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
@@ -81,9 +92,104 @@ function Header({ onToggleSection }) {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isConfirmDisconnectOpen, setIsConfirmDisconnectOpen] = useState(false);
+  const [isTranslateOpen, setIsTranslateOpen] = useState(false);
+  const [selectedTranslateLang, setSelectedTranslateLang] = useState("en");
+  const [availableTranslateLanguages, setAvailableTranslateLanguages] = useState([]);
+  const [translateSearch, setTranslateSearch] = useState("");
+  const [translateLoading, setTranslateLoading] = useState(true);
 
   const profileRef = useRef(null);
   const mobileMenuRef = useRef(null);
+  const translateRef = useRef(null);
+
+  useEffect(() => {
+    const stored = String(localStorage.getItem("site_translate_lang") || "en").toLowerCase();
+    if (stored) setSelectedTranslateLang(stored);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let timer;
+
+    const syncLanguagesFromGoogle = () => {
+      const combo = document.querySelector(".goog-te-combo");
+      if (!combo) return false;
+
+      const options = Array.from(combo.options || [])
+        .map((opt) => ({
+          code: String(opt.value || "").trim().toLowerCase(),
+          label: String(opt.textContent || opt.label || "").trim(),
+        }))
+        .filter((opt) => opt.code && opt.label);
+
+      if (options.length === 0) return false;
+
+      const unique = [];
+      const seen = new Set();
+      for (const item of options) {
+        if (seen.has(item.code)) continue;
+        seen.add(item.code);
+        unique.push(item);
+      }
+
+      if (!seen.has("en")) unique.unshift({ code: "en", label: "English" });
+      unique.sort((a, b) => {
+        if (a.code === "en") return -1;
+        if (b.code === "en") return 1;
+        return a.label.localeCompare(b.label);
+      });
+
+      setAvailableTranslateLanguages(unique);
+      setTranslateLoading(false);
+      return true;
+    };
+
+    const startLanguageSyncPolling = () => {
+      let tries = 0;
+      const maxTries = 50;
+      timer = setInterval(() => {
+        tries += 1;
+        const ok = syncLanguagesFromGoogle();
+        if (ok || tries >= maxTries) {
+          clearInterval(timer);
+          if (!ok) setTranslateLoading(false);
+        }
+      }, 150);
+    };
+
+    const initGoogleTranslateElement = () => {
+      if (!window.google?.translate?.TranslateElement) return;
+      if (!window.__googleTranslateElementMounted) {
+        new window.google.translate.TranslateElement(
+          { pageLanguage: "en", autoDisplay: false },
+          "google_translate_element"
+        );
+        window.__googleTranslateElementMounted = true;
+      }
+      startLanguageSyncPolling();
+    };
+
+    window.googleTranslateElementInit = initGoogleTranslateElement;
+
+    if (window.google?.translate?.TranslateElement) {
+      initGoogleTranslateElement();
+    } else {
+      const existingScript = document.getElementById("google-translate-script");
+      if (!existingScript) {
+        const script = document.createElement("script");
+        script.id = "google-translate-script";
+        script.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+        script.async = true;
+        document.body.appendChild(script);
+      } else {
+        startLanguageSyncPolling();
+      }
+    }
+
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, []);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -94,11 +200,44 @@ function Header({ onToggleSection }) {
       if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
         setIsMenuOpen(false);
       }
+      if (translateRef.current && !translateRef.current.contains(event.target)) {
+        setIsTranslateOpen(false);
+      }
     }
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (translateLoading) return;
+    const exists = availableTranslateLanguages.some((item) => item.code === selectedTranslateLang);
+    if (!exists) {
+      setSelectedTranslateLang("en");
+      localStorage.setItem("site_translate_lang", "en");
+    }
+  }, [availableTranslateLanguages, selectedTranslateLang, translateLoading]);
+
+  useEffect(() => {
+    if (!isTranslateOpen) setTranslateSearch("");
+  }, [isTranslateOpen]);
+
+  const filteredTranslateLanguages = availableTranslateLanguages.filter((lang) =>
+    lang.label.toLowerCase().includes(translateSearch.trim().toLowerCase())
+  );
+
+  const translateTo = (langCode) => {
+    const code = String(langCode || "en").toLowerCase();
+    setSelectedTranslateLang(code);
+    localStorage.setItem("site_translate_lang", code);
+    setIsTranslateOpen(false);
+
+    // Google website translator uses this cookie to choose language.
+    const googTransValue = code === "en" ? "/auto/en" : `/auto/${code}`;
+    document.cookie = `googtrans=${googTransValue};path=/`;
+    document.cookie = `googtrans=${googTransValue};path=/;SameSite=Lax`;
+    window.location.reload();
+  };
 
   // Generate initials for avatar fallback
   const getInitials = (name) => {
@@ -241,6 +380,55 @@ function Header({ onToggleSection }) {
                 )}
               </div>
             )}
+
+            <div className="relative" ref={translateRef}>
+              <button
+                onClick={() => {
+                  setIsTranslateOpen((prev) => !prev);
+                  setTranslateSearch("");
+                }}
+                className="w-10 h-10 rounded-full bg-[var(--card-bg)]/50 backdrop-blur-xl border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:border-[var(--accent)] transition-all duration-300 flex items-center justify-center"
+                aria-label="Translate"
+                title="Translate"
+                aria-expanded={isTranslateOpen}
+                aria-haspopup="menu"
+              >
+                <IconGlobe className="w-5 h-5" />
+              </button>
+
+              {isTranslateOpen && (
+                <div className="absolute right-0 mt-2 w-56 max-h-72 overflow-y-auto no-scrollbar bg-[var(--card-bg)] border border-[var(--accent)]/30 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                  <div className="px-3 pb-2 border-b border-[var(--accent)]/20">
+                    <input
+                      type="text"
+                      value={translateSearch}
+                      onChange={(e) => setTranslateSearch(e.target.value)}
+                      placeholder="Search language..."
+                      className="w-full bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-all"
+                    />
+                  </div>
+                  {translateLoading ? (
+                    <div className="px-4 py-3 text-xs text-[var(--text-secondary)]/70">Loading languages...</div>
+                  ) : filteredTranslateLanguages.length === 0 ? (
+                    <div className="px-4 py-3 text-xs text-[var(--text-secondary)]/70">No language found</div>
+                  ) : filteredTranslateLanguages.map((lang) => {
+                    const active = selectedTranslateLang === lang.code;
+                    return (
+                      <button
+                        key={lang.code}
+                        onClick={() => translateTo(lang.code)}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${
+                          active ? "bg-[var(--accent)]/10 text-[var(--accent)] font-bold" : "hover:bg-[var(--accent)]/10"
+                        }`}
+                      >
+                        <span>{lang.label}</span>
+                        {active ? <span className="text-[10px] uppercase tracking-widest">Selected</span> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Right Section - Mobile Hamburger */}
@@ -280,6 +468,40 @@ function Header({ onToggleSection }) {
                         {theme === "light" ? <IconSun className="w-3 h-3 text-amber-500" /> : <IconMoon className="w-3 h-3 text-slate-700" />}
                       </span>
                     </button>
+                  </div>
+
+                  <div className="px-2">
+                    <label className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1.5 block">Translate</label>
+                    <input
+                      type="text"
+                      value={translateSearch}
+                      onChange={(e) => setTranslateSearch(e.target.value)}
+                      placeholder="Search language..."
+                      className="w-full mb-2 bg-[var(--card-bg)]/60 border border-[var(--accent)]/30 rounded-lg px-3 py-2 text-[10px] font-semibold focus:outline-none focus:border-[var(--accent)]"
+                    />
+                    <div className="relative">
+                      <IconGlobe className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 opacity-60" />
+                      <select
+                        value={selectedTranslateLang}
+                        onChange={(e) => {
+                          setIsMenuOpen(false);
+                          translateTo(e.target.value);
+                        }}
+                        className="w-full pl-9 pr-3 py-2.5 text-[10px] font-black rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 transition-all uppercase tracking-widest appearance-none"
+                      >
+                        {translateLoading ? (
+                          <option value={selectedTranslateLang}>Loading languages...</option>
+                        ) : filteredTranslateLanguages.length === 0 ? (
+                          <option value={selectedTranslateLang}>No language found</option>
+                        ) : (
+                          filteredTranslateLanguages.map((lang) => (
+                            <option key={lang.code} value={lang.code}>
+                              {lang.label}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
                   </div>
 
                   {/* Mobile Recent Battles Button */}
@@ -481,6 +703,7 @@ function Header({ onToggleSection }) {
       )}
 
       <HelpDeskModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+      <div id="google_translate_element" className="hidden" />
 
       <ConfirmModal 
         isOpen={isConfirmDisconnectOpen}

@@ -728,6 +728,104 @@ async function handleUsersSummary(req, res) {
   });
 }
 
+async function handleLastfmSyncNow(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const admin = verifyAdminRequest(req, res);
+  if (!admin) return;
+
+  const host = req.headers["x-forwarded-host"] || req.headers.host;
+  const proto = req.headers["x-forwarded-proto"] || "https";
+  if (!host) {
+    return res.status(400).json({ error: "Unable to resolve host for sync trigger" });
+  }
+
+  const headers = { "Content-Type": "application/json" };
+  if (process.env.CRON_SECRET) {
+    headers.Authorization = `Bearer ${process.env.CRON_SECRET}`;
+  }
+
+  const syncResponse = await fetch(`${proto}://${host}/api/cron/lastfm-sync`, {
+    method: "POST",
+    headers,
+  });
+  const syncData = await syncResponse.json().catch(() => ({}));
+  if (!syncResponse.ok) {
+    return res.status(syncResponse.status).json({
+      error: syncData.error || "Failed to run Last.fm sync",
+      details: syncData,
+    });
+  }
+
+  return res.status(200).json({
+    success: true,
+    triggeredBy: admin.email || admin.id || "admin",
+    sync: syncData,
+  });
+}
+
+async function handleTopScrobblers(req, res) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const admin = verifyAdminRequest(req, res);
+  if (!admin) return;
+
+  const db = await getDb();
+  const leaderboardCollection = db.collection("lastfm_user_leaderboard");
+
+  const resetKey = String(req.query?.resetKey || toResetKeyUTC(new Date())).trim();
+  const battleId = String(req.query?.battleId || "").trim();
+  const limitRaw = Number.parseInt(String(req.query?.limit || "10"), 10);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(50, limitRaw)) : 10;
+
+  const match = { resetKey };
+  if (battleId) {
+    match.battleId = battleId;
+  }
+
+  const rows = await leaderboardCollection
+    .aggregate([
+      { $match: match },
+      {
+        $group: {
+          _id: "$userId",
+          userId: { $first: "$userId" },
+          lastfmUsername: { $first: "$lastfmUsername" },
+          region: { $first: "$region" },
+          albumStreams: { $sum: "$albumStreams" },
+          titleStreams: { $sum: "$titleStreams" },
+          totalStreams: { $sum: "$totalStreams" },
+          battleCount: { $sum: 1 },
+          updatedAt: { $max: "$updatedAt" },
+        },
+      },
+      { $sort: { totalStreams: -1, titleStreams: -1, albumStreams: -1 } },
+      { $limit: limit },
+    ])
+    .toArray();
+
+  return res.status(200).json({
+    success: true,
+    resetKey,
+    battleId: battleId || null,
+    top: rows.map((row, index) => ({
+      rank: index + 1,
+      userId: row.userId || row._id || "",
+      lastfmUsername: row.lastfmUsername || "",
+      region: row.region || "",
+      albumStreams: Number(row.albumStreams || 0),
+      titleStreams: Number(row.titleStreams || 0),
+      totalStreams: Number(row.totalStreams || 0),
+      battleCount: Number(row.battleCount || 0),
+      updatedAt: row.updatedAt || null,
+    })),
+  });
+}
+
 export default async function handler(req, res) {
   setCors(res);
 
@@ -757,6 +855,10 @@ export default async function handler(req, res) {
         return await handleLastfmBattleStats(req, res);
       case "users-summary":
         return await handleUsersSummary(req, res);
+      case "lastfm-sync-now":
+        return await handleLastfmSyncNow(req, res);
+      case "top-scrobblers":
+        return await handleTopScrobblers(req, res);
       default:
         return res.status(404).json({ error: "Not found" });
     }

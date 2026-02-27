@@ -1,5 +1,10 @@
 import { getDb } from "../../lib/mongodb.js";
 
+const ON_DEMAND_SYNC_MIN_INTERVAL_MS = Number.parseInt(
+  process.env.LASTFM_ON_DEMAND_SYNC_MIN_INTERVAL_MS || "90000",
+  10
+);
+
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -37,6 +42,55 @@ function toCount(value) {
   return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : 0;
 }
 
+async function maybeTriggerOnDemandSync(req, db) {
+  const stateCollection = db.collection("lastfm_sync_trigger_state");
+  const stateId = "aggregate-trigger";
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - ON_DEMAND_SYNC_MIN_INTERVAL_MS);
+
+  const claim = await stateCollection.findOneAndUpdate(
+    {
+      id: stateId,
+      $or: [{ lastTriggeredAt: { $lte: cutoff } }, { lastTriggeredAt: { $exists: false } }],
+    },
+    {
+      $set: { id: stateId, lastTriggeredAt: now, updatedAt: now },
+      $setOnInsert: { createdAt: now },
+    },
+    { upsert: true, returnDocument: "before" }
+  );
+
+  const alreadyRecent =
+    claim?.lastTriggeredAt &&
+    now.getTime() - new Date(claim.lastTriggeredAt).getTime() < ON_DEMAND_SYNC_MIN_INTERVAL_MS;
+
+  if (alreadyRecent) return;
+
+  const host = req.headers["x-forwarded-host"] || req.headers.host;
+  if (!host) return;
+  const proto = req.headers["x-forwarded-proto"] || "https";
+  const baseUrl = `${proto}://${host}`;
+
+  const headers = { "Content-Type": "application/json" };
+  if (process.env.CRON_SECRET) {
+    headers.Authorization = `Bearer ${process.env.CRON_SECRET}`;
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    await fetch(`${baseUrl}/api/cron/lastfm-sync`, {
+      method: "POST",
+      headers,
+      signal: controller.signal,
+    });
+  } catch {
+    // Ignore sync trigger failure; aggregate endpoint should still respond.
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export default async function handler(req, res) {
   setCors(res);
 
@@ -60,6 +114,7 @@ export default async function handler(req, res) {
     const configKey = buildConfigKey({ regionA, regionB, artist, albumName, trackName });
 
     const db = await getDb();
+    await maybeTriggerOnDemandSync(req, db);
     const aggregatesCollection = db.collection("lastfm_battle_aggregates");
     const doc = await aggregatesCollection.findOne({ battleId: String(battleId), resetKey, configKey });
 

@@ -5,6 +5,7 @@ import useTimeline from "../hooks/useTimeline";
 import useRegionalData from "../hooks/useRegionalData";
 import useModStatus from "../hooks/useModStatus";
 import useGalleryData from "../hooks/useGalleryData";
+import useDailyUpdates from "../hooks/useDailyUpdates";
 import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
 import { COUNTRY_PRESETS, COUNTRY_REGION_MAP, COUNTRIES, COUNTRY_TZ_MAP, FOCUS_PLAYLISTS } from "../constants";
@@ -287,15 +288,21 @@ function AdminPanel() {
   const [userSummary, setUserSummary] = useState({ signups: 0, lastfmConnected: 0, lastfmNotConnected: 0 });
   const [userSummaryLoading, setUserSummaryLoading] = useState(true);
   const [userSummaryError, setUserSummaryError] = useState("");
+  const [syncNowLoading, setSyncNowLoading] = useState(false);
+  const [lastSyncStatus, setLastSyncStatus] = useState("");
+  const [topScrobblers, setTopScrobblers] = useState([]);
+  const [topScrobblersLoading, setTopScrobblersLoading] = useState(false);
+  const [topScrobblersError, setTopScrobblersError] = useState("");
   const { battles, liveBattles, addBattle, updateBattle, updateLiveBattles, deleteBattle, clearBattles, resetLiveBattles, loading: battlesLoading } = useBattles();
   const { events, addEvent, updateEvent, deleteEvent, clearTimeline, resetToDefault, loading: timelineLoading } = useTimeline();
   const { regions, addRegion, deleteRegion, resetRegions, loading: regionsLoading } = useRegionalData();
   const { mods, toggleStatus, updateModDetails, resetMods, loading: modsLoading } = useModStatus();
   const { galleryImages, loading: galleryLoading, resetGallery, addGalleryImage, deleteGalleryImage, updateGalleryImage } = useGalleryData();
+  const { updates, latestUpdate, addUpdate, deleteUpdate, clearUpdates, loading: updatesLoading } = useDailyUpdates();
   const toast = useToast();
   const { token } = useAuth();
 
-  const isDataLoading = regionsLoading || modsLoading || battlesLoading || timelineLoading || galleryLoading;
+  const isDataLoading = regionsLoading || modsLoading || battlesLoading || timelineLoading || galleryLoading || updatesLoading;
   
   // New Battle History Form State
   const [newBattle, setNewBattle] = useState({
@@ -343,6 +350,8 @@ function AdminPanel() {
   const [editingBattle, setEditingBattle] = useState(null);
   const [editingEventId, setEditingEventId] = useState(null);
   const [editingEvent, setEditingEvent] = useState(null);
+  const [dailyUpdateDraft, setDailyUpdateDraft] = useState({ title: "", message: "", imageUrl: "", quote: "", uploadedImageData: "", uploadedImageName: "" });
+  const [previewUpdateId, setPreviewUpdateId] = useState(null);
 
   useEffect(() => {
     setLiveEdits(liveBattles);
@@ -562,6 +571,82 @@ function AdminPanel() {
     setShowCountryDrop(false);
   };
 
+  const handleSyncNow = async () => {
+    if (!token || syncNowLoading) return;
+
+    setSyncNowLoading(true);
+    setLastSyncStatus("");
+    try {
+      const response = await fetch("/api/auth/lastfm-sync-now", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to run Last.fm sync");
+      }
+
+      const processed = Number(data?.sync?.results?.reduce?.((acc, r) => acc + (Number(r?.processedUsers) || 0), 0) || 0);
+      setLastSyncStatus(`Synced successfully${processed ? ` (${processed} users processed)` : ""}.`);
+      toast.show("Last.fm sync completed.", "success");
+      if (activeTab === "battles") {
+        setTopScrobblersLoading(true);
+        const leaderboardResponse = await fetch("/api/auth/top-scrobblers?limit=10", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const leaderboardData = await leaderboardResponse.json().catch(() => ({}));
+        if (leaderboardResponse.ok) {
+          setTopScrobblers(Array.isArray(leaderboardData.top) ? leaderboardData.top : []);
+          setTopScrobblersError("");
+        } else {
+          setTopScrobblersError(leaderboardData.error || "Failed to refresh leaderboard");
+        }
+        setTopScrobblersLoading(false);
+      }
+    } catch (error) {
+      setLastSyncStatus(error.message || "Sync failed.");
+      toast.show(error.message || "Sync failed.", "error");
+    } finally {
+      setSyncNowLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab !== "battles") return;
+
+    let active = true;
+    const loadTopScrobblers = async () => {
+      setTopScrobblersLoading(true);
+      setTopScrobblersError("");
+      try {
+        const response = await fetch("/api/auth/top-scrobblers?limit=10", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load leaderboard");
+        }
+        if (active) {
+          setTopScrobblers(Array.isArray(data.top) ? data.top : []);
+        }
+      } catch (error) {
+        if (active) setTopScrobblersError(error.message || "Failed to load leaderboard");
+      } finally {
+        if (active) setTopScrobblersLoading(false);
+      }
+    };
+
+    loadTopScrobblers();
+    const intervalId = setInterval(loadTopScrobblers, 60000);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [activeTab, token]);
+
   const formatBattleTimeLabel = (value) => {
     const timeText = String(value || "").trim();
     if (!timeText) return "N/A";
@@ -576,9 +661,23 @@ function AdminPanel() {
       
       <main className="max-w-7xl mx-auto px-6 md:px-12 lg:px-16 py-12">
         <div className="sticky top-[68px] z-40 bg-[var(--bg-primary)]/80 backdrop-blur-md pb-6 mb-12 border-b border-[var(--accent)]/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-          <h1 className="text-4xl font-black text-[var(--accent)] tracking-tight">Admin Dashboard</h1>
+          <div>
+            <h1 className="text-4xl font-black text-[var(--accent)] tracking-tight">Admin Dashboard</h1>
+            {lastSyncStatus ? (
+              <p className="mt-2 text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">
+                {lastSyncStatus}
+              </p>
+            ) : null}
+          </div>
           
-          <div className="relative">
+          <div className="relative flex items-center gap-3">
+            <button
+              onClick={handleSyncNow}
+              disabled={syncNowLoading}
+              className="px-4 py-3 rounded-xl border border-[var(--accent)]/30 text-[var(--accent)] text-xs font-black uppercase tracking-widest hover:bg-[var(--accent)]/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {syncNowLoading ? "Syncing..." : "Sync Now"}
+            </button>
             <button 
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="p-3 bg-[var(--accent)] text-black rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-[var(--accent)]/30 hover:scale-[1.05] active:scale-95 transition-all"
@@ -589,7 +688,7 @@ function AdminPanel() {
                 <line x1="3" y1="18" x2="21" y2="18"></line>
               </svg>
               <span className="text-xs uppercase tracking-widest hidden md:inline">
-                {activeTab.replace("timeline", "Timeline").replace("regions", "Regions").replace("mods", "Mods").replace("global", "Global Config").replace("battles", "Battles").replace("tickets", "Support Tickets")}
+                {activeTab.replace("timeline", "Timeline").replace("regions", "Regions").replace("mods", "Mods").replace("updates", "Daily Updates").replace("global", "Global Config").replace("battles", "Battles").replace("tickets", "Support Tickets")}
               </span>
             </button>
 
@@ -604,6 +703,7 @@ function AdminPanel() {
                   <MenuButton tab="timeline" label="Timeline Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="regions" label="Region Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="mods" label="Mod Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
+                  <MenuButton tab="updates" label="Daily Updates" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="gallery" label="Gallery Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="global" label="Global Config" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                 </div>
@@ -703,6 +803,69 @@ function AdminPanel() {
 
         {activeTab === "battles" && (
           <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-[var(--card-bg)]/60 backdrop-blur-xl border border-[var(--accent)]/30 rounded-3xl p-4 sm:p-5 mb-8">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                <h3 className="text-base sm:text-lg font-black text-[var(--accent)] uppercase tracking-tight">Top 10 Scrobblers (Today)</h3>
+                <button
+                  onClick={async () => {
+                    setTopScrobblersLoading(true);
+                    setTopScrobblersError("");
+                    try {
+                      const response = await fetch("/api/auth/top-scrobblers?limit=10", {
+                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                      });
+                      const data = await response.json().catch(() => ({}));
+                      if (!response.ok) throw new Error(data.error || "Failed to load leaderboard");
+                      setTopScrobblers(Array.isArray(data.top) ? data.top : []);
+                    } catch (error) {
+                      setTopScrobblersError(error.message || "Failed to load leaderboard");
+                    } finally {
+                      setTopScrobblersLoading(false);
+                    }
+                  }}
+                  className="w-full sm:w-auto px-3 py-2 rounded-lg border border-[var(--accent)]/30 text-[var(--accent)] text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent)]/10 transition-all"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              {topScrobblersLoading && <p className="text-xs font-bold text-[var(--text-secondary)]">Loading leaderboard...</p>}
+              {topScrobblersError && <p className="text-xs font-bold text-red-400">{topScrobblersError}</p>}
+
+              {!topScrobblersLoading && !topScrobblersError && (
+                topScrobblers.length === 0 ? (
+                  <p className="text-xs font-bold text-[var(--text-secondary)]">No scrobbles synced yet for today.</p>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl border border-[var(--accent)]/10">
+                    <table className="w-full text-left min-w-[620px]">
+                      <thead>
+                        <tr className="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] bg-[var(--accent)]/5">
+                          <th className="py-2 px-3">#</th>
+                          <th className="py-2 pr-3">Last.fm User</th>
+                          <th className="py-2 pr-3">Region</th>
+                          <th className="py-2 pr-3">Album Streams</th>
+                          <th className="py-2 pr-3">Title Streams</th>
+                          <th className="py-2 pr-3">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--accent)]/10">
+                        {topScrobblers.map((row) => (
+                          <tr key={`${row.userId}-${row.rank}`} className="text-xs sm:text-sm">
+                            <td className="py-2 px-3 font-black text-[var(--accent)]">{row.rank}</td>
+                            <td className="py-2 pr-3 font-bold">{row.lastfmUsername || "-"}</td>
+                            <td className="py-2 pr-3">{row.region || "-"}</td>
+                            <td className="py-2 pr-3 font-bold">{Number(row.albumStreams || 0).toLocaleString()}</td>
+                            <td className="py-2 pr-3 font-bold">{Number(row.titleStreams || 0).toLocaleString()}</td>
+                            <td className="py-2 pr-3 font-black text-[var(--accent)]">{Number(row.totalStreams || 0).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              )}
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
               
               {/* List of Battles */}
@@ -1581,6 +1744,217 @@ function AdminPanel() {
             resetMods={resetMods} 
             toast={toast}
           />
+        )}
+        {activeTab === "updates" && (
+          <section className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-6 sm:mb-8">
+              <h2 className="text-xl sm:text-2xl font-bold">Daily Updates</h2>
+              {latestUpdate && (
+                <span className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)] break-words">
+                  Last updated: {new Date(latestUpdate.updatedAt).toLocaleString()}
+                </span>
+              )}
+            </div>
+
+            <div className="bg-[var(--card-bg)]/80 backdrop-blur-2xl p-3 sm:p-6 rounded-2xl sm:rounded-3xl border border-[var(--accent)]/40 shadow-xl">
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Update Title (Optional)</label>
+                  <input
+                    type="text"
+                    value={dailyUpdateDraft.title}
+                    onChange={(e) => setDailyUpdateDraft((prev) => ({ ...prev, title: e.target.value }))}
+                    placeholder="Daily update headline"
+                    className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Update Message</label>
+                  <textarea
+                    rows={8}
+                    value={dailyUpdateDraft.message}
+                    onChange={(e) => setDailyUpdateDraft((prev) => ({ ...prev, message: e.target.value }))}
+                    placeholder="Share daily goals, reminders, and important updates..."
+                    className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30 resize-y"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Image URL (Optional)</label>
+                  <input
+                    type="text"
+                    value={dailyUpdateDraft.imageUrl}
+                    onChange={(e) => setDailyUpdateDraft((prev) => ({ ...prev, imageUrl: e.target.value }))}
+                    placeholder="https://.../update-image.png"
+                    className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Upload Image (Optional)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (file.size > 2 * 1024 * 1024) {
+                        toast.show("Image must be 2MB or smaller.", "error");
+                        e.target.value = "";
+                        return;
+                      }
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setDailyUpdateDraft((prev) => ({
+                          ...prev,
+                          uploadedImageData: String(reader.result || ""),
+                          uploadedImageName: file.name || "",
+                        }));
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] file:mr-2 sm:file:mr-3 file:px-2.5 sm:file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-[var(--accent)]/20 file:text-[var(--accent)] file:font-bold"
+                  />
+                  <p className="mt-1 text-[10px] text-[var(--text-secondary)]/70 font-bold uppercase tracking-wide">
+                    URL or uploaded image will be used. Upload takes priority. Max 2MB.
+                  </p>
+                </div>
+
+                {(dailyUpdateDraft.uploadedImageData || dailyUpdateDraft.imageUrl) ? (
+                  <div className="bg-[var(--bg-primary)]/40 border border-[var(--accent)]/10 rounded-xl p-3">
+                    <p className="text-[9px] font-black uppercase text-[var(--text-secondary)] mb-2">
+                      Image Preview {dailyUpdateDraft.uploadedImageName ? `(${dailyUpdateDraft.uploadedImageName})` : ""}
+                    </p>
+                    <img
+                      src={dailyUpdateDraft.uploadedImageData || dailyUpdateDraft.imageUrl}
+                      alt="Daily update preview"
+                      className="w-full max-h-44 sm:max-h-52 object-contain rounded-lg border border-[var(--accent)]/10 bg-black/10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setDailyUpdateDraft((prev) => ({ ...prev, uploadedImageData: "", uploadedImageName: "" }))}
+                      className="mt-2 w-full sm:w-auto px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
+                    >
+                      Remove Uploaded Image
+                    </button>
+                  </div>
+                ) : null}
+
+                <div>
+                  <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Motivation Quote (Optional)</label>
+                  <input
+                    type="text"
+                    value={dailyUpdateDraft.quote}
+                    onChange={(e) => setDailyUpdateDraft((prev) => ({ ...prev, quote: e.target.value }))}
+                    placeholder="Keep streaming, ARMY!"
+                    className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={() => {
+                      if (!dailyUpdateDraft.message.trim()) {
+                        toast.show("Please enter an update message before publishing.", "error");
+                        return;
+                      }
+                      addUpdate({
+                        ...dailyUpdateDraft,
+                        imageUrl: dailyUpdateDraft.uploadedImageData || dailyUpdateDraft.imageUrl,
+                      });
+                      setDailyUpdateDraft({ title: "", message: "", imageUrl: "", quote: "", uploadedImageData: "", uploadedImageName: "" });
+                      toast.show("Daily update added.", "success");
+                    }}
+                    className="w-full sm:w-auto bg-[var(--accent)] text-black dark:text-black font-black px-4 sm:px-8 py-3 rounded-xl shadow-lg shadow-[var(--accent)]/20 hover:scale-[1.05] active:scale-95 transition-all text-[11px] sm:text-xs tracking-widest uppercase"
+                  >
+                    Add Update
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (!confirm("Clear the current daily update?")) return;
+                      clearUpdates();
+                      setDailyUpdateDraft({ title: "", message: "", imageUrl: "", quote: "", uploadedImageData: "", uploadedImageName: "" });
+                      toast.show("Daily update cleared.", "info");
+                    }}
+                    className="w-full sm:w-auto bg-red-500/10 text-red-500 border border-red-500/20 font-black px-4 sm:px-8 py-3 rounded-xl hover:bg-red-500 hover:text-white transition-all text-[11px] sm:text-xs tracking-widest uppercase"
+                  >
+                    Clear Update
+                  </button>
+                </div>
+
+                {updates.length > 0 ? (
+                  <div className="mt-2 border-t border-[var(--accent)]/10 pt-4">
+                    <p className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1 mb-2">
+                      Published Updates ({updates.length})
+                    </p>
+                    <div className="max-h-56 overflow-y-auto no-scrollbar space-y-2 pr-0.5 sm:pr-1">
+                      {updates.map((item) => (
+                        <div key={item.id} className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 bg-[var(--bg-primary)]/40 border border-[var(--accent)]/10 rounded-xl p-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-black text-[var(--accent)] truncate">
+                              {item.title || "Untitled Update"}
+                            </p>
+                            <p className="text-[11px] font-semibold text-[var(--text-primary)]/80 line-clamp-2 break-words">
+                              {item.message}
+                            </p>
+                          </div>
+                          <div className="shrink-0 flex items-center gap-2 self-end sm:self-auto">
+                            <button
+                              onClick={() => setPreviewUpdateId((prev) => (prev === item.id ? null : item.id))}
+                              className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent)] hover:text-black transition-all"
+                            >
+                              {previewUpdateId === item.id ? "Hide" : "Preview"}
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (!confirm("Delete this update?")) return;
+                                deleteUpdate(item.id);
+                                if (previewUpdateId === item.id) setPreviewUpdateId(null);
+                                toast.show("Update deleted.", "info");
+                              }}
+                              className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {updates.map((item) => (
+                      previewUpdateId === item.id ? (
+                        <div key={`preview-${item.id}`} className="mt-3 bg-[var(--card-bg)] border border-[var(--accent)]/20 rounded-2xl p-3 sm:p-5">
+                          <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)] mb-2">Preview</p>
+                          {item.title ? (
+                            <h4 className="text-base sm:text-lg font-black text-[var(--accent)] tracking-tight mb-2 break-words">{item.title}</h4>
+                          ) : null}
+                          {item.imageUrl ? (
+                            <div className="mb-3">
+                              <img
+                                src={item.imageUrl}
+                                alt={item.title || "Update preview image"}
+                                className="w-full max-h-44 sm:max-h-56 object-contain rounded-xl border border-[var(--accent)]/15 bg-black/10"
+                              />
+                              {item.quote ? (
+                                <p className="mt-2 text-xs sm:text-sm italic font-bold text-[var(--accent)]/90 text-center break-words">
+                                  {item.quote}
+                                </p>
+                              ) : null}
+                            </div>
+                          ) : null}
+                          <p className="text-sm font-semibold leading-relaxed whitespace-pre-line break-words text-[var(--text-primary)]/90">
+                            {item.message}
+                          </p>
+                        </div>
+                      ) : null
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </section>
         )}
         {activeTab === "gallery" && (
           <GalleryManagerSection 
