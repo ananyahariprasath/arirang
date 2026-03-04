@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { useTheme } from "../../context/ThemeContext";
 
 function TopAchieversDrawer({ onClose, isOpen }) {
+  const { theme } = useTheme();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -35,7 +37,11 @@ function TopAchieversDrawer({ onClose, isOpen }) {
   }, [isOpen]);
 
   return (
-    <div className="w-[100vw] max-w-[400px] sm:w-[620px] lg:w-[720px] h-full bg-[var(--bg-primary)] border-l border-[var(--accent)]/20 shadow-[-20px_0_50px_rgba(0,0,0,0.3)] overflow-y-auto p-6 sm:p-8 flex flex-col pt-24 lg:pt-28">
+    <div
+      className={`w-[100vw] max-w-[400px] sm:w-[620px] lg:w-[720px] h-full border-l border-[var(--accent)]/20 shadow-[-20px_0_50px_rgba(0,0,0,0.3)] overflow-y-auto p-6 sm:p-8 flex flex-col pt-24 lg:pt-28 ${
+        theme === "light" ? "bg-[#faf8ff]" : "bg-[var(--bg-primary)]"
+      }`}
+    >
       <div className="flex justify-between items-center mb-6 sm:mb-8">
         <div>
           <h2 className="text-lg sm:text-xl font-black text-[var(--accent)] tracking-tight">Top 10 Achievers</h2>
@@ -62,8 +68,8 @@ function TopAchieversDrawer({ onClose, isOpen }) {
         )}
 
         {!loading && !error && rows.length === 0 && (
-          <div className="flex-1 flex flex-col items-center justify-center min-h-[300px] opacity-30 text-center animate-in fade-in zoom-in duration-500">
-            <div className="w-16 h-16 rounded-full bg-[var(--accent)]/5 flex items-center justify-center mb-4 border border-[var(--accent)]/10">
+          <div className={`flex-1 flex flex-col items-center justify-center min-h-[300px] text-center animate-in fade-in zoom-in duration-500 ${theme === "light" ? "opacity-50" : "opacity-30"}`}>
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 border ${theme === "light" ? "bg-indigo-500/10 border-indigo-500/20" : "bg-[var(--accent)]/5 border-[var(--accent)]/10"}`}>
               <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)]">
                 <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
               </svg>
@@ -74,19 +80,22 @@ function TopAchieversDrawer({ onClose, isOpen }) {
         )}
 
         {!loading && !error && rows.length > 0 && (
-          <div className="rounded-2xl border border-[var(--accent)]/10 overflow-hidden">
+          <div className={`rounded-2xl border overflow-hidden ${theme === "light" ? "border-indigo-300/40 bg-white/80" : "border-[var(--accent)]/10"}`}>
             <table className="w-full text-left table-fixed">
               <thead>
-                <tr className="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] bg-[var(--accent)]/5">
+                <tr className={`text-[10px] uppercase tracking-widest text-[var(--text-secondary)] ${theme === "light" ? "bg-indigo-500/10" : "bg-[var(--accent)]/5"}`}>
                   <th className="py-2 px-3 w-12">#</th>
                   <th className="py-2 pr-3 w-[42%]">User</th>
                   <th className="py-2 pr-3 w-[36%]">Region</th>
                   <th className="py-2 pr-3 w-[22%]">Total</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--accent)]/10">
+              <tbody className={`divide-y ${theme === "light" ? "divide-indigo-200/60" : "divide-[var(--accent)]/10"}`}>
                 {rows.map((row) => (
-                  <tr key={`${row.rank}-${row.lastfmUsername || "unknown"}`} className="text-xs sm:text-sm">
+                  <tr
+                    key={`${row.rank}-${row.lastfmUsername || "unknown"}`}
+                    className={`text-xs sm:text-sm ${theme === "light" ? "hover:bg-indigo-500/5" : "hover:bg-[var(--accent)]/5"}`}
+                  >
                     <td className="py-2 px-3 font-black text-[var(--accent)]">{row.rank}</td>
                     <td className="py-2 pr-3 font-bold truncate" title={row.lastfmUsername || "-"}>{row.lastfmUsername || "-"}</td>
                     <td className="py-2 pr-3 truncate" title={row.region || "-"}>{row.region || "-"}</td>

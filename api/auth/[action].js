@@ -12,6 +12,86 @@ const MAX_CONCURRENT_USERS = 3;
 const BATTLE_START_AT_ISO = "2026-03-20T13:00:00+09:00";
 const USERNAME_REGEX = /^[A-Za-z0-9_]+$/;
 const STRONG_PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function renderOtpEmailHtml({ heading, subheading, otp, expiryMinutes = 2 }) {
+  return `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="color-scheme" content="light dark" />
+        <meta name="supported-color-schemes" content="light dark" />
+        <style>
+          .app-bg { background:#f6f3ff; color:#1a1230; }
+          .card { background:#ffffff; border:1px solid rgba(99,102,241,0.28); }
+          .muted { color:#5b4f7a; }
+          .otp-wrap { background:#f3efff; border:1px dashed rgba(99,102,241,0.45); }
+          .otp { color:#4f46e5; }
+          .top { background:linear-gradient(135deg,#efe9ff,#ffffff); }
+          @media (prefers-color-scheme: dark) {
+            .app-bg { background:#0f0a1a !important; color:#f5f2ff !important; }
+            .card { background:#1b1030 !important; border-color:rgba(167,139,250,0.35) !important; }
+            .muted { color:#d8c8ff !important; }
+            .otp-wrap { background:#140a25 !important; border-color:rgba(167,139,250,0.5) !important; }
+            .otp { color:#c4a1ff !important; }
+            .top { background:linear-gradient(135deg,#2a184a,#1b1030) !important; }
+          }
+        </style>
+      </head>
+      <body class="app-bg" style="margin:0;padding:24px;font-family:Segoe UI,Arial,sans-serif;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;border-radius:14px;overflow:hidden;" class="card">
+          <tr>
+            <td style="padding:20px 22px;border-bottom:1px solid rgba(99,102,241,0.2);" class="top">
+              <h1 style="margin:0;font-size:20px;line-height:1.2;font-weight:800;letter-spacing:0.2px;" class="otp">
+                ARIRANG SPOTIFY TAKEOVER
+              </h1>
+              <p style="margin:6px 0 0;font-size:12px;opacity:0.9;" class="muted">
+                ${subheading}
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:22px;">
+              <p style="margin:0 0 12px;font-size:14px;line-height:1.55;" class="muted">
+                ${heading}
+              </p>
+              <div style="margin:14px 0 16px;padding:14px 16px;border-radius:12px;text-align:center;" class="otp-wrap">
+                <span style="display:inline-block;font-size:28px;letter-spacing:6px;font-weight:900;" class="otp">
+                  ${otp}
+                </span>
+              </div>
+              <p style="margin:0 0 8px;font-size:12px;" class="muted">
+                This OTP expires in <strong style="color:inherit;">${expiryMinutes} minutes</strong>.
+              </p>
+              <p style="margin:0;font-size:12px;" class="muted">
+                If you did not request this, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:14px 22px;border-top:1px solid rgba(99,102,241,0.18);">
+              <p style="margin:0;font-size:11px;opacity:0.9;" class="muted">
+                This is an automated message from Arirang Support.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `;
+}
+
+function escapeRegex(value = "") {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function toUsernameKey(value = "") {
+  return String(value || "").trim().toLowerCase();
+}
+
+function toEmailKey(value = "") {
+  return String(value || "").trim().toLowerCase();
+}
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Credentials", "true");
@@ -230,11 +310,18 @@ async function handleLogin(req, res) {
   if (!email || !password) {
     return res.status(400).json({ error: "Email and password are required" });
   }
+  const normalizedEmail = toEmailKey(email);
 
   const db = await getDb();
   const usersCollection = db.collection("users");
 
-  const user = await usersCollection.findOne({ email });
+  const user = await usersCollection.findOne({
+    $or: [
+      { email: normalizedEmail },
+      { emailKey: normalizedEmail },
+      { email: new RegExp(`^${escapeRegex(normalizedEmail)}$`, "i") },
+    ],
+  });
   if (!user) {
     return res.status(401).json({ error: "Invalid credentials" });
   }
@@ -279,10 +366,16 @@ async function handleSignup(req, res) {
   }
 
   const normalizedUsername = String(username || "").trim();
+  const usernameKey = toUsernameKey(normalizedUsername);
+  const normalizedEmail = toEmailKey(email);
   if (!USERNAME_REGEX.test(normalizedUsername)) {
     return res.status(400).json({
       error: "Username can contain only letters, numbers, and underscore (_) with no spaces.",
     });
+  }
+
+  if (!EMAIL_REGEX.test(normalizedEmail)) {
+    return res.status(400).json({ error: "Please provide a valid email address" });
   }
 
   if (!STRONG_PASSWORD_REGEX.test(String(password || ""))) {
@@ -294,9 +387,26 @@ async function handleSignup(req, res) {
   const db = await getDb();
   const usersCollection = db.collection("users");
 
-  const existingUser = await usersCollection.findOne({ email });
+  const existingUser = await usersCollection.findOne({
+    $or: [
+      { email: normalizedEmail },
+      { emailKey: normalizedEmail },
+      { email: new RegExp(`^${escapeRegex(normalizedEmail)}$`, "i") },
+    ],
+  });
   if (existingUser) {
     return res.status(400).json({ error: "User with this email already exists" });
+  }
+
+  const existingUsername = await usersCollection.findOne({
+    $or: [
+      { username: normalizedUsername },
+      { usernameKey },
+      { username: new RegExp(`^${escapeRegex(normalizedUsername)}$`, "i") },
+    ],
+  });
+  if (existingUsername) {
+    return res.status(400).json({ error: "Username is already in use" });
   }
 
   const salt = await bcrypt.genSalt(10);
@@ -304,8 +414,10 @@ async function handleSignup(req, res) {
 
   const now = new Date();
   const newUser = {
-    email,
+    email: normalizedEmail,
+    emailKey: normalizedEmail,
     username: normalizedUsername,
+    usernameKey,
     password: hashedPassword,
     country,
     region,
@@ -318,7 +430,7 @@ async function handleSignup(req, res) {
   const result = await usersCollection.insertOne(newUser);
 
   const token = jwt.sign(
-    { id: result.insertedId.toString(), email, role: newUser.role },
+    { id: result.insertedId.toString(), email: normalizedEmail, role: newUser.role },
     JWT_SECRET,
     { expiresIn: "7d" }
   );
@@ -407,7 +519,12 @@ async function handleForgotPassword(req, res) {
     to: email,
     subject: "Arirang Spotify Takeover OTP Verification",
     text: `Your OTP for password reset is: ${otp}. It is valid for 2 minutes.`,
-    html: `<p>Your OTP for password reset is: <b>${otp}</b></p><p>It is valid for 2 minutes.</p>`,
+    html: renderOtpEmailHtml({
+      heading: "Use the OTP below to reset your password:",
+      subheading: "Password Reset Verification",
+      otp,
+      expiryMinutes: 2,
+    }),
   };
 
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {
@@ -417,6 +534,187 @@ async function handleForgotPassword(req, res) {
   }
 
   return res.status(200).json({ success: true, message: "If an account exists, an OTP has been sent." });
+}
+
+async function handleProfileEmailOtpSend(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const decoded = verifyUserRequest(req, res);
+  if (!decoded) return;
+
+  const userId = String(decoded.id || "").trim();
+  if (!ObjectId.isValid(userId)) {
+    return res.status(400).json({ error: "Invalid user id" });
+  }
+
+  const newEmailRaw = String(req.body?.newEmail || "").trim();
+  const newEmailKey = toEmailKey(newEmailRaw);
+  if (!EMAIL_REGEX.test(newEmailKey)) {
+    return res.status(400).json({ error: "Please provide a valid email address" });
+  }
+
+  const db = await getDb();
+  const usersCollection = db.collection("users");
+  const objectId = new ObjectId(userId);
+  const currentUser = await usersCollection.findOne(
+    { _id: objectId },
+    { projection: { email: 1, emailKey: 1 } }
+  );
+  if (!currentUser) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const currentEmailKey = toEmailKey(currentUser.emailKey || currentUser.email || "");
+  if (newEmailKey === currentEmailKey) {
+    return res.status(400).json({ error: "New email must be different from current email" });
+  }
+
+  const duplicateEmail = await usersCollection.findOne(
+    {
+      _id: { $ne: objectId },
+      $or: [
+        { email: newEmailKey },
+        { emailKey: newEmailKey },
+        { email: new RegExp(`^${escapeRegex(newEmailKey)}$`, "i") },
+      ],
+    },
+    { projection: { _id: 1 } }
+  );
+  if (duplicateEmail) {
+    return res.status(400).json({ error: "Email is already in use" });
+  }
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otpExpiry = new Date(Date.now() + 2 * 60 * 1000);
+
+  await usersCollection.updateOne(
+    { _id: objectId },
+    {
+      $set: {
+        pendingEmailKey: newEmailKey,
+        pendingEmailOtp: otp,
+        pendingEmailOtpExpiry: otpExpiry,
+      },
+    }
+  );
+
+  let transporter;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpService = process.env.SMTP_SERVICE;
+  const smtpHost = process.env.SMTP_HOST;
+  const smtpPort = parseInt(process.env.SMTP_PORT || "587", 10);
+
+  if (smtpUser && smtpPass) {
+    if (smtpService) {
+      transporter = nodemailer.createTransport({
+        service: smtpService,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+    } else if (smtpHost) {
+      transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+    } else if (smtpUser.includes("ethereal.email")) {
+      transporter = nodemailer.createTransport({
+        host: "smtp.ethereal.email",
+        port: 587,
+        secure: false,
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+    } else {
+      transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user: smtpUser, pass: smtpPass },
+      });
+    }
+  }
+
+  const mailOptions = {
+    from: `"Arirang Support" <${smtpUser}>`,
+    to: newEmailKey,
+    subject: "Verify your new email - OTP",
+    text: `Your OTP to verify this email change is: ${otp}. It is valid for 2 minutes.`,
+    html: renderOtpEmailHtml({
+      heading: "We received a request to change your account email. Use the OTP below to verify this email address:",
+      subheading: "Email Change Verification",
+      otp,
+      expiryMinutes: 2,
+    }),
+  };
+
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    try {
+      await transporter.sendMail(mailOptions);
+      return res.status(200).json({ success: true, message: "OTP sent to new email" });
+    } catch (error) {
+      console.error("Email-change OTP send failed:", error);
+      return res.status(502).json({
+        error: "Failed to send OTP email. Check SMTP configuration.",
+      });
+    }
+  }
+
+  // Local/dev fallback: no SMTP configured.
+  if (process.env.NODE_ENV !== "production") {
+    console.warn("SMTP credentials missing. Dev email-change OTP:", otp);
+    return res.status(200).json({
+      success: true,
+      message: "SMTP not configured. Use dev OTP from server logs.",
+      devOtp: otp,
+    });
+  }
+
+  return res.status(500).json({
+    error: "Email service not configured.",
+  });
+}
+
+async function handleProfileEmailOtpVerify(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const decoded = verifyUserRequest(req, res);
+  if (!decoded) return;
+
+  const userId = String(decoded.id || "").trim();
+  if (!ObjectId.isValid(userId)) {
+    return res.status(400).json({ error: "Invalid user id" });
+  }
+
+  const newEmailKey = toEmailKey(req.body?.newEmail || "");
+  const otp = String(req.body?.otp || "").trim();
+  if (!newEmailKey || !otp) {
+    return res.status(400).json({ error: "newEmail and otp are required" });
+  }
+
+  const db = await getDb();
+  const usersCollection = db.collection("users");
+  const user = await usersCollection.findOne(
+    { _id: new ObjectId(userId) },
+    { projection: { pendingEmailKey: 1, pendingEmailOtp: 1, pendingEmailOtpExpiry: 1 } }
+  );
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const pendingEmailKey = toEmailKey(user.pendingEmailKey || "");
+  if (!pendingEmailKey || pendingEmailKey !== newEmailKey) {
+    return res.status(200).json({ success: true, valid: false, reason: "email_mismatch" });
+  }
+
+  if (!user.pendingEmailOtpExpiry || new Date() > new Date(user.pendingEmailOtpExpiry)) {
+    return res.status(200).json({ success: true, valid: false, reason: "expired" });
+  }
+
+  const valid = String(user.pendingEmailOtp || "") === otp;
+  return res.status(200).json({ success: true, valid });
 }
 
 async function handleVerifyOtp(req, res) {
@@ -658,15 +956,89 @@ async function handleProfile(req, res) {
     });
   }
 
+  const username = String(req.body?.username || "").trim();
+  const email = String(req.body?.email || "").trim();
+  const usernameKey = toUsernameKey(username);
+  const emailKey = toEmailKey(email);
   const country = String(req.body?.country || "").trim();
   const region = String(req.body?.region || "").trim();
-  if (!country || !region) {
-    return res.status(400).json({ error: "country and region are required" });
+  if (!username || !email || !country || !region) {
+    return res.status(400).json({ error: "username, email, country and region are required" });
+  }
+  if (!USERNAME_REGEX.test(username)) {
+    return res.status(400).json({
+      error: "Username can contain only letters, numbers, and underscore (_) with no spaces.",
+    });
+  }
+  if (!EMAIL_REGEX.test(emailKey)) {
+    return res.status(400).json({ error: "Please provide a valid email address" });
+  }
+
+  const currentUser = await usersCollection.findOne(
+    { _id: objectId },
+    { projection: { email: 1, emailKey: 1, pendingEmailKey: 1, pendingEmailOtp: 1, pendingEmailOtpExpiry: 1 } }
+  );
+  if (!currentUser) return res.status(404).json({ error: "User not found" });
+
+  const currentEmailKey = toEmailKey(currentUser.emailKey || currentUser.email || "");
+  const emailChanged = emailKey !== currentEmailKey;
+  if (emailChanged) {
+    const emailOtp = String(req.body?.emailOtp || "").trim();
+    if (!emailOtp) {
+      return res.status(400).json({ error: "Email OTP is required to change email" });
+    }
+    const pendingEmailKey = toEmailKey(currentUser.pendingEmailKey || "");
+    if (!pendingEmailKey || pendingEmailKey !== emailKey) {
+      return res.status(400).json({ error: "Request a new OTP for this email address" });
+    }
+    if (String(currentUser.pendingEmailOtp || "") !== emailOtp) {
+      return res.status(400).json({ error: "Invalid email OTP" });
+    }
+    if (!currentUser.pendingEmailOtpExpiry || new Date() > new Date(currentUser.pendingEmailOtpExpiry)) {
+      return res.status(400).json({ error: "Email OTP has expired" });
+    }
+  }
+
+  const duplicateUsername = await usersCollection.findOne(
+    {
+      _id: { $ne: objectId },
+      $or: [
+        { username },
+        { usernameKey },
+        { username: new RegExp(`^${escapeRegex(username)}$`, "i") },
+      ],
+    },
+    { projection: { _id: 1 } }
+  );
+  if (duplicateUsername) {
+    return res.status(400).json({ error: "Username is already in use" });
+  }
+
+  const duplicateEmail = await usersCollection.findOne(
+    {
+      _id: { $ne: objectId },
+      $or: [
+        { email: emailKey },
+        { emailKey },
+        { email: new RegExp(`^${escapeRegex(emailKey)}$`, "i") },
+      ],
+    },
+    { projection: { _id: 1 } }
+  );
+  if (duplicateEmail) {
+    return res.status(400).json({ error: "Email is already in use" });
+  }
+
+  const updateDoc = {
+    $set: { username, usernameKey, email: emailKey, emailKey, country, region },
+  };
+  if (emailChanged) {
+    updateDoc.$unset = { pendingEmailKey: "", pendingEmailOtp: "", pendingEmailOtpExpiry: "" };
   }
 
   const result = await usersCollection.findOneAndUpdate(
     { _id: objectId },
-    { $set: { country, region } },
+    updateDoc,
     { returnDocument: "after", projection: { username: 1, email: 1, country: 1, region: 1, lastfmUsername: 1, createdAt: 1 } }
   );
   if (!result) return res.status(404).json({ error: "User not found" });
@@ -1453,6 +1825,10 @@ export default async function handler(req, res) {
         return await handleProfilePreferences(req, res);
       case "profile":
         return await handleProfile(req, res);
+      case "profile-email-otp-send":
+        return await handleProfileEmailOtpSend(req, res);
+      case "profile-email-otp-verify":
+        return await handleProfileEmailOtpVerify(req, res);
       case "lastfm-session":
         return await handleLastfmSession(req, res);
       case "lastfm-battle-stats":

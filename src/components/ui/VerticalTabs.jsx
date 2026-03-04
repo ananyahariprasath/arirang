@@ -30,7 +30,7 @@ function IconButton({ onClick, label, children, className = "" }) {
   return (
     <button
       onClick={onClick}
-      className={`group relative w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 border ${className}`}
+      className={`group relative w-10 h-10 lg:w-11 lg:h-11 rounded-xl flex items-center justify-center transition-all duration-300 border ${className}`}
       aria-label={label}
       title={label}
     >
@@ -44,7 +44,7 @@ function IconButton({ onClick, label, children, className = "" }) {
 
 function VerticalTabs({ onToggleSection }) {
   return (
-    <div className="hidden lg:flex fixed right-3 top-1/2 -translate-y-1/2 z-[100] flex-col gap-2.5">
+    <div className="hidden sm:flex fixed right-1.5 md:right-2 lg:right-3 top-1/2 -translate-y-1/2 z-[120] flex-col gap-1.5 md:gap-2 lg:gap-2.5">
       <IconButton
         onClick={() => onToggleSection("top-achievers")}
         label="Top 10"

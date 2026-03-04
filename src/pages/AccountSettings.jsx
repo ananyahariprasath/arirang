@@ -8,22 +8,33 @@ import { COUNTRIES, COUNTRY_REGION_MAP } from "../constants";
 function AccountSettings({ onBack, onOpenAdmin }) {
   const { user, token, updateUser, logout } = useAuth();
   const toast = useToast();
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [baselineEmail, setBaselineEmail] = useState("");
   const [country, setCountry] = useState("");
   const [region, setRegion] = useState("");
   const [loading, setLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [emailOtp, setEmailOtp] = useState("");
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
+  const [emailOtpStatus, setEmailOtpStatus] = useState("idle");
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteVerified, setDeleteVerified] = useState(false);
   const [verifyingDeletePassword, setVerifyingDeletePassword] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
 
   useEffect(() => {
+    setUsername(String(user?.username || ""));
+    const nextEmail = String(user?.email || "");
+    setEmail(nextEmail);
+    setBaselineEmail(nextEmail);
     setCountry(String(user?.country || ""));
     setRegion(String(user?.region || ""));
-  }, [user?.country, user?.region]);
+  }, [user?.username, user?.email, user?.country, user?.region]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !user?.id) return;
     let active = true;
 
     const loadProfile = async () => {
@@ -37,9 +48,19 @@ function AccountSettings({ onBack, onOpenAdmin }) {
         if (!active || !response.ok) return;
         const nextCountry = String(data?.user?.country || "");
         const nextRegion = String(data?.user?.region || "");
+        const nextUsername = String(data?.user?.username || "");
+        const nextEmail = String(data?.user?.email || "");
+        setUsername(nextUsername);
+        setEmail(nextEmail);
+        setBaselineEmail(nextEmail);
+        setEmailOtp("");
+        setEmailOtpSent(false);
+        setEmailOtpStatus("idle");
         setCountry(nextCountry);
         setRegion(nextRegion);
         updateUser({
+          username: nextUsername || null,
+          email: nextEmail || null,
           country: nextCountry || null,
           region: nextRegion || null,
           lastfmUsername: data?.user?.lastfmUsername || null,
@@ -53,15 +74,81 @@ function AccountSettings({ onBack, onOpenAdmin }) {
     return () => {
       active = false;
     };
-  }, [token, updateUser]);
+  }, [token, user?.id]);
 
   const inferredRegion = useMemo(() => COUNTRY_REGION_MAP[country] || "", [country]);
+  const isEmailChanged = useMemo(
+    () => String(email || "").trim().toLowerCase() !== String(baselineEmail || "").trim().toLowerCase(),
+    [email, baselineEmail]
+  );
+
+  const handleSendEmailOtp = async () => {
+    if (!token || !isEmailChanged) return;
+    const nextEmail = String(email || "").trim();
+    if (!nextEmail) {
+      toast.show("Enter your new email first.", "error");
+      return;
+    }
+
+    setSendingEmailOtp(true);
+    try {
+      const response = await fetch("/api/auth/profile-email-otp-send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ newEmail: nextEmail }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send OTP");
+      }
+      setEmailOtpSent(true);
+      setEmailOtpStatus("idle");
+      toast.show("OTP sent to your new email.", "success");
+    } catch (error) {
+      toast.show(error.message || "Failed to send OTP", "error");
+    } finally {
+      setSendingEmailOtp(false);
+    }
+  };
+
+  const handleVerifyEmailOtp = async (otpValue) => {
+    if (!token || !isEmailChanged || !emailOtpSent) return;
+    const otp = String(otpValue || "").trim();
+    const nextEmail = String(email || "").trim();
+    if (otp.length < 6 || !nextEmail) {
+      setEmailOtpStatus("idle");
+      return;
+    }
+
+    setEmailOtpStatus("checking");
+    try {
+      const response = await fetch("/api/auth/profile-email-otp-verify", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ newEmail: nextEmail, otp }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setEmailOtpStatus("invalid");
+        return;
+      }
+      setEmailOtpStatus(data?.valid ? "valid" : "invalid");
+    } catch {
+      setEmailOtpStatus("invalid");
+    }
+  };
 
   const handleSave = async () => {
     if (!token) return;
     const finalRegion = region || inferredRegion;
-    if (!country || !finalRegion) {
-      toast.show("Select a valid country and region.", "error");
+    if (!username.trim() || !email.trim() || !country || !finalRegion) {
+      toast.show("Username, email, country and region are required.", "error");
       return;
     }
 
@@ -73,16 +160,28 @@ function AccountSettings({ onBack, onOpenAdmin }) {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ country, region: finalRegion }),
+        body: JSON.stringify({
+          username: username.trim(),
+          email: email.trim(),
+          country,
+          region: finalRegion,
+          emailOtp: isEmailChanged ? emailOtp.trim() : "",
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(data.error || "Failed to update profile");
       }
       updateUser({
+        username: data?.user?.username || username.trim(),
+        email: data?.user?.email || email.trim(),
         country: data?.user?.country || country,
         region: data?.user?.region || finalRegion,
       });
+      setBaselineEmail(data?.user?.email || email.trim());
+      setEmailOtp("");
+      setEmailOtpSent(false);
+      setEmailOtpStatus("idle");
       toast.show("Profile updated.", "success");
     } catch (error) {
       toast.show(error.message || "Failed to update profile", "error");
@@ -180,15 +279,74 @@ function AccountSettings({ onBack, onOpenAdmin }) {
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Username</p>
-              <div className="px-3 py-2 rounded-xl bg-[var(--bg-primary)]/60 border border-[var(--accent)]/15 text-sm font-bold">
-                {user?.username || "-"}
-              </div>
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm outline-none focus:border-[var(--accent)]"
+              />
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Email</p>
-              <div className="px-3 py-2 rounded-xl bg-[var(--bg-primary)]/60 border border-[var(--accent)]/15 text-sm font-bold break-all">
-                {user?.email || "-"}
-              </div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setEmailOtp("");
+                  setEmailOtpSent(false);
+                  setEmailOtpStatus("idle");
+                }}
+                className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm outline-none focus:border-[var(--accent)]"
+              />
+              {isEmailChanged && (
+                <div className="mt-2 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleSendEmailOtp()}
+                      disabled={sendingEmailOtp || loading || profileLoading}
+                      className="px-2.5 py-1 rounded-lg border border-[var(--accent)]/30 text-[var(--accent)] text-[10px] font-black uppercase tracking-wider disabled:opacity-50"
+                    >
+                      {sendingEmailOtp ? "Sending..." : "Send OTP"}
+                    </button>
+                    <span className="text-[10px] font-bold opacity-60">
+                      {emailOtpSent ? "OTP sent. Check inbox." : "Verify new email before save."}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      value={emailOtp}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\s+/g, "");
+                        setEmailOtp(value);
+                        if (value.length < 6) {
+                          setEmailOtpStatus("idle");
+                          return;
+                        }
+                        void handleVerifyEmailOtp(value);
+                      }}
+                      onBlur={() => void handleVerifyEmailOtp(emailOtp)}
+                      placeholder="Enter OTP"
+                      className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2 pr-8 rounded-lg text-xs outline-none focus:border-[var(--accent)]"
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                      {emailOtpStatus === "checking" && (
+                        <span className="block w-3 h-3 border-2 border-[var(--accent)]/40 border-t-[var(--accent)] rounded-full animate-spin" />
+                      )}
+                      {emailOtpStatus === "valid" && (
+                        <svg viewBox="0 0 20 20" className="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" strokeWidth="2.8" aria-hidden="true">
+                          <path d="M4 10l4 4 8-8" />
+                        </svg>
+                      )}
+                      {emailOtpStatus === "invalid" && (
+                        <svg viewBox="0 0 20 20" className="w-3.5 h-3.5 text-red-400" fill="none" stroke="currentColor" strokeWidth="2.8" aria-hidden="true">
+                          <path d="M5 5l10 10M15 5L5 15" />
+                        </svg>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
             <div>
               <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Country</p>
@@ -222,7 +380,7 @@ function AccountSettings({ onBack, onOpenAdmin }) {
           </div>
           <button
             onClick={() => void handleSave()}
-            disabled={loading || profileLoading}
+            disabled={loading || profileLoading || (isEmailChanged && emailOtpStatus !== "valid")}
             className="mt-5 px-4 py-2.5 rounded-xl bg-[var(--accent)] text-white text-xs font-black uppercase tracking-widest hover:opacity-90 transition-all disabled:opacity-50"
           >
             {loading ? "Saving..." : "Save Profile"}

@@ -6,8 +6,8 @@ export default function useCountdown() {
   // KST = UTC + 9
   // So UTC time = 2026-03-20T04:00:00Z
 
-  //const targetDate = new Date("2026-03-20T04:00:00Z").getTime();
-  const targetDate = new Date(Date.now() ).getTime();
+  const targetDate = new Date("2026-03-20T04:00:00Z").getTime();
+  //const targetDate = new Date(Date.now() ).getTime();
 
 
   const [timeLeft, setTimeLeft] = useState(getTimeRemaining());
