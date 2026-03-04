@@ -293,6 +293,11 @@ function AdminPanel() {
   const [topScrobblers, setTopScrobblers] = useState([]);
   const [topScrobblersLoading, setTopScrobblersLoading] = useState(false);
   const [topScrobblersError, setTopScrobblersError] = useState("");
+  const [deleteScrobblerLoadingId, setDeleteScrobblerLoadingId] = useState("");
+  const [healthLoading, setHealthLoading] = useState(true);
+  const [healthError, setHealthError] = useState("");
+  const [healthChecks, setHealthChecks] = useState(null);
+  const [healthGeneratedAt, setHealthGeneratedAt] = useState("");
   const [customNotifDraft, setCustomNotifDraft] = useState({
     message: "",
     level: "info",
@@ -367,6 +372,81 @@ function AdminPanel() {
   const [editingEvent, setEditingEvent] = useState(null);
   const [dailyUpdateDraft, setDailyUpdateDraft] = useState({ title: "", message: "", imageUrl: "", quote: "", uploadedImageData: "", uploadedImageName: "" });
   const [previewUpdateId, setPreviewUpdateId] = useState(null);
+
+  const battleValidation = useMemo(() => {
+    const hints = [];
+    const blocking = [];
+
+    if (!newBattle.date) blocking.push("Pick a battle date.");
+    if (!String(newBattle.time || "").trim()) blocking.push("Add battle time in KST.");
+    if (!String(newBattle.target || "").trim()) blocking.push("Set a target (example: 10M).");
+    if (!String(newBattle.regions || "").trim()) {
+      blocking.push("Add at least one region.");
+    } else {
+      const regionCount = newBattle.regions
+        .split(",")
+        .map((r) => r.trim())
+        .filter(Boolean).length;
+      if (regionCount === 0) blocking.push("Add valid region names (comma separated).");
+    }
+
+    const progressValue = Number(newBattle.progress);
+    if (!Number.isFinite(progressValue) || progressValue < 0 || progressValue > 100) {
+      blocking.push("Progress must be between 0 and 100.");
+    }
+
+    if (newBattle.reachedTarget && Number.isFinite(progressValue) && progressValue < 100) {
+      hints.push("Reached target is ON, but progress is below 100%.");
+    }
+    if (!newBattle.reachedTarget && Number.isFinite(progressValue) && progressValue >= 100) {
+      hints.push("Missed target is ON, but progress is 100% or above.");
+    }
+
+    return { blocking, hints, isValid: blocking.length === 0 };
+  }, [newBattle]);
+
+  const regionValidation = useMemo(() => {
+    const hints = [];
+    const blocking = [];
+    const country = String(newRegion.country || "").trim();
+    const region = String(newRegion.region || "").trim();
+    const goal = String(newRegion.goal || "").trim();
+    const tz = String(newRegion.tz || "").trim();
+    const gFormUrl = String(newRegion.gFormUrl || "").trim();
+
+    if (!country) {
+      blocking.push("Select a country.");
+    } else if (!COUNTRIES.includes(country)) {
+      hints.push("Country is custom text. Pick from dropdown to avoid mismatches.");
+    }
+    if (!region) blocking.push("Region is required.");
+    if (!goal) blocking.push("Streaming goal is required.");
+
+    if (tz && !tz.includes("/")) {
+      hints.push("Timezone usually follows IANA format like Asia/Kolkata.");
+    }
+
+    if (gFormUrl) {
+      try {
+        const parsed = new URL(gFormUrl);
+        if (!["http:", "https:"].includes(parsed.protocol)) {
+          blocking.push("Google Form URL must start with http or https.");
+        }
+      } catch {
+        blocking.push("Google Form URL is not valid.");
+      }
+    }
+
+    return { blocking, hints, isValid: blocking.length === 0 };
+  }, [newRegion]);
+
+  const overallHealthStatus = useMemo(() => {
+    const entries = Object.values(healthChecks || {});
+    if (!entries.length) return "warn";
+    if (entries.some((entry) => entry?.status === "error")) return "error";
+    if (entries.some((entry) => entry?.status === "warn")) return "warn";
+    return "ok";
+  }, [healthChecks]);
 
   useEffect(() => {
     let active = true;
@@ -657,6 +737,34 @@ function AdminPanel() {
     }
   };
 
+  const handleDeleteTopScrobbler = async (row) => {
+    const userId = String(row?.userId || "").trim();
+    if (!userId || !token) return;
+    if (!confirm(`Delete ${row?.lastfmUsername || "this user"} from today's leaderboard?`)) return;
+
+    setDeleteScrobblerLoadingId(userId);
+    try {
+      const response = await fetch("/api/auth/top-scrobblers", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete leaderboard row");
+      }
+      setTopScrobblers((prev) => prev.filter((item) => String(item.userId) !== userId));
+      toast.show("Leaderboard row deleted.", "success");
+    } catch (error) {
+      toast.show(error.message || "Failed to delete leaderboard row", "error");
+    } finally {
+      setDeleteScrobblerLoadingId("");
+    }
+  };
+
   const handleSendCustomNotification = async (e) => {
     e.preventDefault();
     if (!token || customNotifSending) return;
@@ -829,6 +937,43 @@ function AdminPanel() {
   }, [activeTab, token]);
 
   useEffect(() => {
+    let active = true;
+
+    const loadHealth = async () => {
+      if (!token) return;
+      if (active) {
+        setHealthLoading(true);
+        setHealthError("");
+      }
+      try {
+        const response = await fetch("/api/auth/health", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load health status");
+        }
+        if (!active) return;
+        setHealthChecks(data.checks || null);
+        setHealthGeneratedAt(data.generatedAt || "");
+      } catch (error) {
+        if (!active) return;
+        setHealthError(error.message || "Failed to load health status");
+      } finally {
+        if (active) setHealthLoading(false);
+      }
+    };
+
+    void loadHealth();
+    const intervalId = setInterval(loadHealth, 60000);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [token]);
+
+  useEffect(() => {
     if (activeTab !== "battles") return;
 
     let active = true;
@@ -911,6 +1056,53 @@ function AdminPanel() {
               </>
             )}
           </div>
+        </div>
+
+        <div className="mb-6 rounded-2xl border border-[var(--accent)]/20 bg-[var(--card-bg)]/50 p-4 backdrop-blur-xl">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Backend Health</p>
+            <div className="flex items-center gap-2">
+              <span
+                className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                  overallHealthStatus === "ok"
+                    ? "text-emerald-400 border-emerald-400/40 bg-emerald-500/10"
+                    : overallHealthStatus === "error"
+                    ? "text-red-400 border-red-400/40 bg-red-500/10"
+                    : "text-amber-300 border-amber-300/40 bg-amber-500/10"
+                }`}
+              >
+                {healthLoading ? "Checking..." : overallHealthStatus}
+              </span>
+              {healthGeneratedAt ? (
+                <span className="text-[10px] font-bold text-[var(--text-secondary)]">
+                  {new Date(healthGeneratedAt).toLocaleTimeString()}
+                </span>
+              ) : null}
+            </div>
+          </div>
+          {healthError ? (
+            <p className="mt-2 text-xs font-bold text-red-400">{healthError}</p>
+          ) : (
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              {["auth", "db", "sync", "aggregate"].map((key) => {
+                const check = healthChecks?.[key];
+                const status = String(check?.status || "warn");
+                return (
+                  <div key={key} className="rounded-xl border border-[var(--accent)]/15 bg-[var(--bg-primary)]/40 px-3 py-2">
+                    <p className="text-[9px] uppercase tracking-widest font-black text-[var(--text-secondary)]">{key}</p>
+                    <p
+                      className={`mt-1 text-[10px] font-black uppercase ${
+                        status === "ok" ? "text-emerald-400" : status === "error" ? "text-red-400" : "text-amber-300"
+                      }`}
+                    >
+                      {status}
+                    </p>
+                    <p className="mt-1 text-[10px] font-semibold opacity-80">{check?.detail || "No data"}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {activeTab === "tickets" && (
@@ -1184,6 +1376,7 @@ function AdminPanel() {
                           <th className="py-2 pr-3">Album Streams</th>
                           <th className="py-2 pr-3">Title Streams</th>
                           <th className="py-2 pr-3">Total</th>
+                          <th className="py-2 pr-3">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--accent)]/10">
@@ -1195,6 +1388,15 @@ function AdminPanel() {
                             <td className="py-2 pr-3 font-bold">{Number(row.albumStreams || 0).toLocaleString()}</td>
                             <td className="py-2 pr-3 font-bold">{Number(row.titleStreams || 0).toLocaleString()}</td>
                             <td className="py-2 pr-3 font-black text-[var(--accent)]">{Number(row.totalStreams || 0).toLocaleString()}</td>
+                            <td className="py-2 pr-3">
+                              <button
+                                onClick={() => void handleDeleteTopScrobbler(row)}
+                                disabled={deleteScrobblerLoadingId === String(row.userId)}
+                                className="px-2.5 py-1 rounded-lg border border-red-500/40 text-red-400 text-[10px] font-black uppercase tracking-widest hover:bg-red-500/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                {deleteScrobblerLoadingId === String(row.userId) ? "Deleting..." : "Delete"}
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1688,9 +1890,24 @@ function AdminPanel() {
                         className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                       />
                     </div>
+                    {battleValidation.blocking.length > 0 && (
+                      <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2">
+                        {battleValidation.blocking.map((msg) => (
+                          <p key={msg} className="text-[10px] font-black text-red-300 uppercase tracking-wide">{msg}</p>
+                        ))}
+                      </div>
+                    )}
+                    {battleValidation.hints.length > 0 && (
+                      <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2">
+                        {battleValidation.hints.map((msg) => (
+                          <p key={msg} className="text-[10px] font-black text-amber-200 uppercase tracking-wide">{msg}</p>
+                        ))}
+                      </div>
+                    )}
                      <button 
                       type="submit"
-                      className="w-full bg-[var(--accent)] text-black dark:text-black font-black py-3 rounded-xl text-xs hover:scale-[1.02] active:scale-[0.98] transition-all mt-2 shadow-lg shadow-[var(--accent)]/20 uppercase tracking-widest"
+                      disabled={!battleValidation.isValid}
+                      className="w-full bg-[var(--accent)] text-black dark:text-black font-black py-3 rounded-xl text-xs hover:scale-[1.02] active:scale-[0.98] transition-all mt-2 shadow-lg shadow-[var(--accent)]/20 uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100"
                     >
                       Add to History 💜
                     </button>
@@ -2063,9 +2280,25 @@ function AdminPanel() {
                     </div>
                   </div>
 
+                  {regionValidation.blocking.length > 0 && (
+                    <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2">
+                      {regionValidation.blocking.map((msg) => (
+                        <p key={msg} className="text-[10px] font-black text-red-300 uppercase tracking-wide">{msg}</p>
+                      ))}
+                    </div>
+                  )}
+                  {regionValidation.hints.length > 0 && (
+                    <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2">
+                      {regionValidation.hints.map((msg) => (
+                        <p key={msg} className="text-[10px] font-black text-amber-200 uppercase tracking-wide">{msg}</p>
+                      ))}
+                    </div>
+                  )}
+
                   <button 
                     type="submit"
-                    className="w-full bg-[var(--accent)] text-black dark:text-black font-black py-4 rounded-xl shadow-lg shadow-[var(--accent)]/20 hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest text-xs"
+                    disabled={!regionValidation.isValid}
+                    className="w-full bg-[var(--accent)] text-black dark:text-black font-black py-4 rounded-xl shadow-lg shadow-[var(--accent)]/20 hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest text-xs disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100"
                   >
                     Save Regional Info 💜
                   </button>

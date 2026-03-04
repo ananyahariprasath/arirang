@@ -622,6 +622,110 @@ async function handleProfilePreferences(req, res) {
   });
 }
 
+async function handleProfile(req, res) {
+  if (!["GET", "POST"].includes(req.method)) {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const decoded = verifyUserRequest(req, res);
+  if (!decoded) return;
+
+  const userId = String(decoded.id || "");
+  if (!ObjectId.isValid(userId)) {
+    return res.status(400).json({ error: "Invalid user ID format" });
+  }
+
+  const db = await getDb();
+  const usersCollection = db.collection("users");
+  const objectId = new ObjectId(userId);
+
+  if (req.method === "GET") {
+    const user = await usersCollection.findOne(
+      { _id: objectId },
+      { projection: { username: 1, email: 1, country: 1, region: 1, lastfmUsername: 1, createdAt: 1 } }
+    );
+    if (!user) return res.status(404).json({ error: "User not found" });
+    return res.status(200).json({
+      success: true,
+      user: {
+        username: String(user.username || ""),
+        email: String(user.email || ""),
+        country: user.country || null,
+        region: user.region || null,
+        lastfmUsername: user.lastfmUsername || null,
+        createdAt: user.createdAt || null,
+      },
+    });
+  }
+
+  const country = String(req.body?.country || "").trim();
+  const region = String(req.body?.region || "").trim();
+  if (!country || !region) {
+    return res.status(400).json({ error: "country and region are required" });
+  }
+
+  const result = await usersCollection.findOneAndUpdate(
+    { _id: objectId },
+    { $set: { country, region } },
+    { returnDocument: "after", projection: { username: 1, email: 1, country: 1, region: 1, lastfmUsername: 1, createdAt: 1 } }
+  );
+  if (!result) return res.status(404).json({ error: "User not found" });
+
+  return res.status(200).json({
+    success: true,
+    user: {
+      username: String(result.username || ""),
+      email: String(result.email || ""),
+      country: result.country || null,
+      region: result.region || null,
+      lastfmUsername: result.lastfmUsername || null,
+      createdAt: result.createdAt || null,
+    },
+  });
+}
+
+async function handleHealth(req, res) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const admin = verifyAdminRequest(req, res);
+  if (!admin) return;
+
+  const checks = {
+    auth: { status: "ok", detail: "Authenticated admin session" },
+    db: { status: "error", detail: "" },
+    sync: { status: "warn", detail: "" },
+    aggregate: { status: "warn", detail: "" },
+  };
+
+  try {
+    const db = await getDb();
+    await db.command({ ping: 1 });
+    checks.db = { status: "ok", detail: "MongoDB reachable" };
+
+    const liveConfigDoc = await db.collection("app_config").findOne({ key: "liveBattles" });
+    const liveCount = Array.isArray(liveConfigDoc?.value) ? liveConfigDoc.value.length : 0;
+    checks.aggregate = liveCount > 0
+      ? { status: "ok", detail: `${liveCount} live battle config entries` }
+      : { status: "warn", detail: "No live battle config found" };
+  } catch (error) {
+    checks.db = { status: "error", detail: error instanceof Error ? error.message : "DB error" };
+  }
+
+  if (process.env.LASTFM_API_KEY) {
+    checks.sync = { status: "ok", detail: "LASTFM_API_KEY configured" };
+  } else {
+    checks.sync = { status: "error", detail: "LASTFM_API_KEY missing" };
+  }
+
+  return res.status(200).json({
+    success: true,
+    generatedAt: new Date().toISOString(),
+    checks,
+  });
+}
+
 async function handleLastfmSession(req, res) {
   if (req.method === "DELETE") {
     const { userId } = req.body || {};
@@ -1003,12 +1107,36 @@ async function fetchTopScrobblerRows({ resetKey, battleId, limit }) {
 }
 
 async function handleTopScrobblers(req, res) {
-  if (req.method !== "GET") {
+  if (!["GET", "DELETE"].includes(req.method)) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   const admin = verifyAdminRequest(req, res);
   if (!admin) return;
+
+  if (req.method === "DELETE") {
+    const userId = String(req.body?.userId || req.query?.userId || "").trim();
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    const resetKey = String(req.body?.resetKey || req.query?.resetKey || toResetKeyUTC(new Date())).trim();
+    const battleId = String(req.body?.battleId || req.query?.battleId || "").trim();
+
+    const db = await getDb();
+    const leaderboardCollection = db.collection("lastfm_user_leaderboard");
+    const filter = { resetKey, userId };
+    if (battleId) filter.battleId = battleId;
+
+    const result = await leaderboardCollection.deleteMany(filter);
+    return res.status(200).json({
+      success: true,
+      resetKey,
+      battleId: battleId || null,
+      userId,
+      deletedCount: result.deletedCount || 0,
+    });
+  }
 
   const resetKey = String(req.query?.resetKey || toResetKeyUTC(new Date())).trim();
   const battleId = String(req.query?.battleId || "").trim();
@@ -1022,6 +1150,87 @@ async function handleTopScrobblers(req, res) {
     battleId: battleId || null,
     top,
   });
+}
+
+async function handleDeleteAccount(req, res) {
+  if (req.method !== "DELETE") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const decoded = verifyUserRequest(req, res);
+  if (!decoded) return;
+
+  const userId = String(decoded.id || "").trim();
+  if (!ObjectId.isValid(userId)) {
+    return res.status(400).json({ error: "Invalid user id" });
+  }
+
+  const password = String(req.body?.password || "").trim();
+  if (!password) {
+    return res.status(400).json({ error: "Password is required" });
+  }
+
+  const db = await getDb();
+  const usersCollection = db.collection("users");
+  const leaderboardCollection = db.collection("lastfm_user_leaderboard");
+  const userStateCollection = db.collection("lastfm_battle_user_state");
+  const baselinesCollection = db.collection("lastfm_scrobble_baselines");
+  const ticketsCollection = db.collection("support_tickets");
+  const proofsCollection = db.collection("proof_submissions");
+
+  const objectId = new ObjectId(userId);
+  const user = await usersCollection.findOne({ _id: objectId }, { projection: { password: 1 } });
+  if (!user?.password) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password);
+  if (!isMatch) {
+    return res.status(401).json({ error: "Incorrect password" });
+  }
+
+  await Promise.all([
+    usersCollection.deleteOne({ _id: objectId }),
+    leaderboardCollection.deleteMany({ userId }),
+    userStateCollection.deleteMany({ userId }),
+    baselinesCollection.deleteMany({ userId }),
+    ticketsCollection.deleteMany({ userId }),
+    proofsCollection.deleteMany({ userId }),
+  ]);
+
+  return res.status(200).json({ success: true, deletedUserId: userId });
+}
+
+async function handleVerifyPassword(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const decoded = verifyUserRequest(req, res);
+  if (!decoded) return;
+
+  const userId = String(decoded.id || "").trim();
+  if (!ObjectId.isValid(userId)) {
+    return res.status(400).json({ error: "Invalid user id" });
+  }
+
+  const password = String(req.body?.password || "").trim();
+  if (!password) {
+    return res.status(400).json({ error: "Password is required" });
+  }
+
+  const db = await getDb();
+  const usersCollection = db.collection("users");
+  const user = await usersCollection.findOne(
+    { _id: new ObjectId(userId) },
+    { projection: { password: 1 } }
+  );
+  if (!user?.password) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const isMatch = await bcrypt.compare(password, user.password);
+  return res.status(200).json({ success: true, valid: Boolean(isMatch) });
 }
 
 async function handlePublicTopScrobblers(req, res) {
@@ -1242,6 +1451,8 @@ export default async function handler(req, res) {
         return await handleProfilePicture(req, res);
       case "profile-preferences":
         return await handleProfilePreferences(req, res);
+      case "profile":
+        return await handleProfile(req, res);
       case "lastfm-session":
         return await handleLastfmSession(req, res);
       case "lastfm-battle-stats":
@@ -1254,6 +1465,12 @@ export default async function handler(req, res) {
         return await handleTopScrobblers(req, res);
       case "public-top-scrobblers":
         return await handlePublicTopScrobblers(req, res);
+      case "delete-account":
+        return await handleDeleteAccount(req, res);
+      case "verify-password":
+        return await handleVerifyPassword(req, res);
+      case "health":
+        return await handleHealth(req, res);
       case "battle-notifications":
         return await handleBattleNotifications(req, res);
       default:

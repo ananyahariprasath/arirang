@@ -35,7 +35,7 @@ function TopAchieversDrawer({ onClose, isOpen }) {
   }, [isOpen]);
 
   return (
-    <div className="w-[100vw] max-w-[400px] sm:w-[480px] h-full bg-[var(--bg-primary)] border-l border-[var(--accent)]/20 shadow-[-20px_0_50px_rgba(0,0,0,0.3)] overflow-y-auto p-6 sm:p-8 flex flex-col pt-24 lg:pt-28">
+    <div className="w-[100vw] max-w-[400px] sm:w-[620px] lg:w-[720px] h-full bg-[var(--bg-primary)] border-l border-[var(--accent)]/20 shadow-[-20px_0_50px_rgba(0,0,0,0.3)] overflow-y-auto p-6 sm:p-8 flex flex-col pt-24 lg:pt-28">
       <div className="flex justify-between items-center mb-6 sm:mb-8">
         <div>
           <h2 className="text-lg sm:text-xl font-black text-[var(--accent)] tracking-tight">Top 10 Achievers</h2>
@@ -74,22 +74,22 @@ function TopAchieversDrawer({ onClose, isOpen }) {
         )}
 
         {!loading && !error && rows.length > 0 && (
-          <div className="overflow-x-auto rounded-2xl border border-[var(--accent)]/10">
-            <table className="w-full text-left min-w-[420px]">
+          <div className="rounded-2xl border border-[var(--accent)]/10 overflow-hidden">
+            <table className="w-full text-left table-fixed">
               <thead>
                 <tr className="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] bg-[var(--accent)]/5">
-                  <th className="py-2 px-3">#</th>
-                  <th className="py-2 pr-3">User</th>
-                  <th className="py-2 pr-3">Region</th>
-                  <th className="py-2 pr-3">Total</th>
+                  <th className="py-2 px-3 w-12">#</th>
+                  <th className="py-2 pr-3 w-[42%]">User</th>
+                  <th className="py-2 pr-3 w-[36%]">Region</th>
+                  <th className="py-2 pr-3 w-[22%]">Total</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--accent)]/10">
                 {rows.map((row) => (
                   <tr key={`${row.rank}-${row.lastfmUsername || "unknown"}`} className="text-xs sm:text-sm">
                     <td className="py-2 px-3 font-black text-[var(--accent)]">{row.rank}</td>
-                    <td className="py-2 pr-3 font-bold">{row.lastfmUsername || "-"}</td>
-                    <td className="py-2 pr-3">{row.region || "-"}</td>
+                    <td className="py-2 pr-3 font-bold truncate" title={row.lastfmUsername || "-"}>{row.lastfmUsername || "-"}</td>
+                    <td className="py-2 pr-3 truncate" title={row.region || "-"}>{row.region || "-"}</td>
                     <td className="py-2 pr-3 font-black text-[var(--accent)]">
                       {Number(row.totalStreams || 0).toLocaleString()}
                     </td>

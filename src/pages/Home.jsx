@@ -52,7 +52,7 @@ function resolveCountryFromUser(user) {
   return caseInsensitive || null;
 }
 
-function Home({ onNavigateToProof, onOpenAdmin }) {
+function Home({ onNavigateToProof, onOpenAdmin, onOpenSettings }) {
   const [selectedCountry, setSelectedCountry] = useState(COUNTRY_PLACEHOLDER);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRecentBattlesOpen, setIsRecentBattlesOpen] = useState(false);
@@ -369,6 +369,8 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
       setIsMilestoneModalOpen(true);
     } else if (section === 'admin') {
       onOpenAdmin?.();
+    } else if (section === "settings") {
+      onOpenSettings?.();
     }
   };
 

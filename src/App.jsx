@@ -3,6 +3,7 @@ import Home from "./pages/Home";
 import AdminPanel from "./pages/AdminPanel";
 import Footer from "./components/layout/Footer";
 import AuthPage from "./pages/AuthPage";
+import AccountSettings from "./pages/AccountSettings";
 
 import { ToastProvider } from "./context/ToastContext";
 import ErrorBoundary from "./components/utils/ErrorBoundary";
@@ -10,6 +11,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 
 function MainApp() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [proofCountry, setProofCountry] = useState(null); // non-null = show SubmitProofPage
   
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -44,11 +46,17 @@ function MainApp() {
           country={proofCountry}
           onBack={handleBackFromProof}
         />
+      ) : isSettingsOpen ? (
+        <AccountSettings
+          onBack={() => setIsSettingsOpen(false)}
+          onOpenAdmin={() => setIsAdminOpen(true)}
+        />
       ) : (
         <>
           <Home 
             onNavigateToProof={handleNavigateToProof} 
             onOpenAdmin={() => setIsAdminOpen(true)}
+            onOpenSettings={() => setIsSettingsOpen(true)}
           />
           <Footer />
         </>

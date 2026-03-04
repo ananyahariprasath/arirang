@@ -55,7 +55,8 @@ function IconSun({ className = "w-4 h-4" }) {
 function IconTools({ className = "w-4 h-4" }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
-      <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.3 2.3-2.4-2.4z" />
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h.01a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z" />
     </svg>
   );
 }
@@ -77,6 +78,17 @@ function IconLogout({ className = "w-4 h-4" }) {
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <path d="M16 17l5-5-5-5" />
       <path d="M21 12H9" />
+    </svg>
+  );
+}
+
+function IconDelete({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M7 6l1 14h8l1-14" />
+      <path d="M10 10v7M14 10v7" />
     </svg>
   );
 }
@@ -103,6 +115,12 @@ function Header({ onToggleSection }) {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isConfirmDisconnectOpen, setIsConfirmDisconnectOpen] = useState(false);
+  const [isConfirmDeleteAccountOpen, setIsConfirmDeleteAccountOpen] = useState(false);
+  const [deleteAccountPassword, setDeleteAccountPassword] = useState("");
+  const [deleteAccountVerified, setDeleteAccountVerified] = useState(false);
+  const [deleteAccountVerifying, setDeleteAccountVerifying] = useState(false);
+  const [deleteAccountSubmitting, setDeleteAccountSubmitting] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState("");
   const [isTranslateOpen, setIsTranslateOpen] = useState(false);
   const [selectedTranslateLang, setSelectedTranslateLang] = useState("en");
   const [availableTranslateLanguages, setAvailableTranslateLanguages] = useState([]);
@@ -294,6 +312,71 @@ function Header({ onToggleSection }) {
     return name.substring(0, 2).toUpperCase();
   };
 
+  const openDeleteAccountModal = () => {
+    setDeleteAccountPassword("");
+    setDeleteAccountVerified(false);
+    setDeleteAccountVerifying(false);
+    setDeleteAccountSubmitting(false);
+    setDeleteAccountError("");
+    setIsConfirmDeleteAccountOpen(true);
+  };
+
+  const verifyDeletePassword = async () => {
+    const password = String(deleteAccountPassword || "").trim();
+    if (!password || !token) return;
+
+    setDeleteAccountVerifying(true);
+    setDeleteAccountError("");
+    try {
+      const response = await fetch("/api/auth/verify-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ password }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Failed to verify password");
+      if (!data.valid) {
+        setDeleteAccountVerified(false);
+        setDeleteAccountError("Password does not match.");
+        return;
+      }
+      setDeleteAccountVerified(true);
+      setDeleteAccountError("");
+    } catch (err) {
+      setDeleteAccountVerified(false);
+      setDeleteAccountError(err.message || "Failed to verify password");
+    } finally {
+      setDeleteAccountVerifying(false);
+    }
+  };
+
+  const deleteAccountNow = async () => {
+    if (!deleteAccountVerified || !token) return;
+    setDeleteAccountSubmitting(true);
+    setDeleteAccountError("");
+    try {
+      const response = await fetch("/api/auth/delete-account", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ password: deleteAccountPassword }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Failed to delete account");
+      setIsConfirmDeleteAccountOpen(false);
+      logout();
+    } catch (err) {
+      setDeleteAccountError(err.message || "Failed to delete account");
+    } finally {
+      setDeleteAccountSubmitting(false);
+    }
+  };
+
   return (
     <>
       <header className="sticky top-0 z-50 backdrop-blur-md bg-[var(--bg-primary)]/80 border-b border-[var(--accent)] transition-all duration-300">
@@ -410,6 +493,16 @@ function Header({ onToggleSection }) {
                       className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--accent)]/10 transition-colors flex items-center gap-2"
                     >
                       <IconShare /> Share Milestone
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setIsProfileDropdownOpen(false);
+                        if (onToggleSection) onToggleSection("settings");
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--accent)]/10 transition-colors flex items-center gap-2"
+                    >
+                      <IconTools /> Account Settings
                     </button>
 
                     {user?.role === "admin" && (
@@ -640,6 +733,16 @@ function Header({ onToggleSection }) {
                         <IconShare /> Share Milestone
                       </button>
 
+                      <button
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          if (onToggleSection) onToggleSection("settings");
+                        }}
+                        className="w-full px-5 py-3 text-[10px] font-black rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all flex items-center justify-center gap-2 tracking-widest uppercase"
+                      >
+                        <IconTools /> Account Settings
+                      </button>
+
                       {user?.role === "admin" && (
                         <button
                           onClick={() => {
@@ -818,6 +921,63 @@ function Header({ onToggleSection }) {
         confirmText="Yes, Disconnect"
         cancelText="No, Keep it"
       />
+
+      {isConfirmDeleteAccountOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="w-[90%] max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative transition-all duration-300 transform animate-in zoom-in-95 duration-300 bg-[var(--card-bg)]/80 backdrop-blur-2xl border-2 border-[var(--accent)]/30 text-[var(--text-primary)]">
+            <h2 className="text-2xl font-black mb-3 text-center uppercase tracking-tighter">
+              Delete Account
+            </h2>
+            <p className="text-center text-sm mb-5 opacity-80 leading-relaxed font-medium">
+              Once you confirm your password, your account will be permanently deleted. This action cannot be undone. Please make sure to back up any important data before proceeding.
+            </p>
+
+            <div className="space-y-3">
+              <input
+                type="password"
+                value={deleteAccountPassword}
+                onChange={(e) => {
+                  setDeleteAccountPassword(e.target.value);
+                  setDeleteAccountVerified(false);
+                  setDeleteAccountError("");
+                }}
+                placeholder="Enter your password"
+                className="w-full px-4 py-3 rounded-xl bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 focus:border-[var(--accent)] outline-none transition-colors text-[var(--text-primary)]"
+              />
+              <button
+                onClick={() => void verifyDeletePassword()}
+                disabled={deleteAccountVerifying || !String(deleteAccountPassword || "").trim()}
+                className="w-full py-3 rounded-2xl border border-[var(--accent)]/30 text-[var(--accent)] font-black uppercase tracking-widest text-xs hover:bg-[var(--accent)]/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleteAccountVerifying ? "Verifying..." : "Verify Password"}
+              </button>
+
+              {deleteAccountVerified ? (
+                <p className="text-center text-xs font-black uppercase tracking-widest text-emerald-400">Password verified</p>
+              ) : null}
+              {deleteAccountError ? (
+                <p className="text-center text-xs font-black text-red-400">{deleteAccountError}</p>
+              ) : null}
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => void deleteAccountNow()}
+                disabled={!deleteAccountVerified || deleteAccountSubmitting}
+                className="w-full py-2.5 rounded-xl bg-red-500 text-white font-black uppercase tracking-wider text-[11px] hover:opacity-90 transition-all shadow-lg shadow-red-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleteAccountSubmitting ? "Deleting..." : "Delete Account"}
+              </button>
+              <button
+                onClick={() => setIsConfirmDeleteAccountOpen(false)}
+                className="w-full py-2.5 rounded-xl bg-transparent border border-[var(--accent)]/30 text-[var(--text-primary)] font-bold uppercase tracking-wider text-[11px] hover:bg-[var(--accent)]/5 transition-all active:scale-95"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
 
   );

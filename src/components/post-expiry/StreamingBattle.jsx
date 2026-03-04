@@ -16,6 +16,16 @@ function getProgress(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function getStatusFromProgress(progress) {
+  const pct = Math.max(0, Math.min(100, Math.round(Number(progress) || 0)));
+  if (pct >= 100) return "Completed";
+  if (pct >= 75) return "Almost There";
+  if (pct >= 50) return "Heating Up";
+  if (pct >= 25) return "On Track";
+  if (pct > 0) return "Surging";
+  return "Yet to Start";
+}
+
 function parseGoalValue(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   const text = String(value || "").trim().toUpperCase().replace(/,/g, "");
@@ -204,8 +214,8 @@ function BattleDetailsModal({ battle, onClose }) {
     ? Math.min(100, Math.round((titleScrobbles / titleGoalValue) * 100))
     : getProgress(safeBattle.titleTrackProgress, albumProgress);
 
-  const albumStatus = safeBattle.status || "Yet to Start";
-  const titleStatus = safeBattle.titleTrackStatus || albumStatus;
+  const albumStatus = getStatusFromProgress(albumProgress);
+  const titleStatus = getStatusFromProgress(titleProgress);
 
   if (!battle) return null;
 
@@ -308,7 +318,7 @@ function LiveBattleCard({ battle, onView, combinedProgress }) {
   const displayProgress = Number.isFinite(combinedProgress)
     ? combinedProgress
     : Math.round((albumProgress + titleProgress) / 2);
-  const albumStatus = battle.status || "Yet to Start";
+  const albumStatus = getStatusFromProgress(displayProgress);
   const statusClass = STATUS_COLORS[albumStatus] ?? "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30";
 
   return (
