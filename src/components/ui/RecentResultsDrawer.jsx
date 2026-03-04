@@ -6,7 +6,7 @@ function RecentResultsDrawer({ onClose }) {
   return (
     <>
       {/* Drawer Content */}
-      <div className="w-[100vw] max-w-[360px] sm:w-[440px] h-full bg-[var(--bg-primary)] border-r border-[var(--accent)]/20 shadow-[20px_0_50px_rgba(0,0,0,0.3)] overflow-y-auto p-6 sm:p-8 flex flex-col pt-24 lg:pt-28">
+      <div className="w-[100vw] max-w-[360px] sm:w-[440px] h-full bg-[var(--bg-primary)] border-l border-[var(--accent)]/20 shadow-[-20px_0_50px_rgba(0,0,0,0.3)] overflow-y-auto p-6 sm:p-8 flex flex-col pt-24 lg:pt-28">
         <div className="flex justify-between items-center mb-6 sm:mb-8">
           <div>
             <h2 className="text-lg sm:text-xl font-black text-[var(--accent)] tracking-tight">Recent Results</h2>

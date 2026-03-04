@@ -15,7 +15,6 @@ function Footer() {
                         to-transparent
                         animate-footer-line">
         </div>
-
       </div>
 
       {/* Footer Content */}
@@ -26,17 +25,13 @@ function Footer() {
                       : "bg-[var(--card-bg)]/80 text-white"
                     }`}
       >
-
         <p className="opacity-70 uppercase tracking-[0.2em] font-bold text-[10px] sm:text-xs">
-          © 2026 ARIRARIRANG. All rights reserved.
+          © 2026 ARIRANG SPOTIFY TAKEOVER. All rights reserved.
         </p>
-
         <p className="mt-1 text-[9px] sm:text-xs opacity-50">
           Designed with 💜 for the BTS ARMY by ARMY. This is a fan project and is not a part of HYBE or BTS.
         </p>
-
       </div>
-
     </footer>
   );
 }

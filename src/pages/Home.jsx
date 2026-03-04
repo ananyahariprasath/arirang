@@ -10,10 +10,13 @@ import Timeline from "../components/post-expiry/Timeline";
 import StreamingBattle from "../components/post-expiry/StreamingBattle";
 import SupportDrawer from "../components/ui/SupportDrawer";
 import RecentResultsDrawer from "../components/ui/RecentResultsDrawer";
+import TopAchieversDrawer from "../components/ui/TopAchieversDrawer";
 import VerticalTabs from "../components/ui/VerticalTabs";
 import Gallery from "../components/post-expiry/Gallery";
 import BattleWinnerModal from "../components/modals/BattleWinnerModal";
 import DailyUpdateModal from "../components/modals/DailyUpdateModal";
+import OnboardingModal from "../components/modals/OnboardingModal";
+import ShareMilestoneModal from "../components/modals/ShareMilestoneModal";
 import useBattles from "../hooks/useBattles";
 import YoutubeEmbed from "../components/section-1/YoutubeEmbed";
 import LanguageDropdown from "../components/section-1/LanguageDropdown";
@@ -54,11 +57,17 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRecentBattlesOpen, setIsRecentBattlesOpen] = useState(false);
   const [isContactOpen, setIsContactOpen] = useState(false);
+  const [isTopAchieversOpen, setIsTopAchieversOpen] = useState(false);
   const [isWinnerModalOpen, setIsWinnerModalOpen] = useState(false);
   const [isDailyUpdateModalOpen, setIsDailyUpdateModalOpen] = useState(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
+  const [isOnboardingPreviewMode, setIsOnboardingPreviewMode] = useState(false);
   const [queueWinnerAfterUpdate, setQueueWinnerAfterUpdate] = useState(false);
   const [isPageReadyForPopups, setIsPageReadyForPopups] = useState(false);
   const lastPopupKeyRef = useRef("");
+  const lastBattleNotificationIdRef = useRef("");
+  const onboardingActionLockRef = useRef(false);
   const { theme } = useTheme();
   const [resetCountdown, setResetCountdown] = useState("00:00:00");
 
@@ -136,8 +145,37 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
   const { isExpired } = useCountdown();
   const { battles, loading } = useBattles();
   const { updates, latestUpdate, loading: dailyUpdatesLoading } = useDailyUpdates();
-  const { user, updateUser } = useAuth();
+  const { user, token, updateUser } = useAuth();
   const toast = useToast();
+
+  useEffect(() => {
+    let active = true;
+
+    const checkBattleNotifications = async () => {
+      if (isOnboardingOpen) return;
+      try {
+        const response = await fetch("/api/auth/battle-notifications", { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        if (!active || !response.ok) return;
+
+        const notification = data?.active;
+        if (!notification?.id) return;
+        if (lastBattleNotificationIdRef.current === notification.id) return;
+
+        lastBattleNotificationIdRef.current = notification.id;
+        toast.show(notification.message || "Battle update available", notification.level === "success" ? "success" : "info");
+      } catch {
+        // Intentionally silent to avoid noisy UX when network is unstable.
+      }
+    };
+
+    checkBattleNotifications();
+    const intervalId = setInterval(checkBattleNotifications, 45 * 1000);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [toast, isOnboardingOpen]);
 
   const preferredWinnerBattles = useMemo(() => {
     const all = Array.isArray(battles) ? battles : [];
@@ -145,6 +183,67 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
     return manualFirst.length > 0 ? manualFirst : all;
   }, [battles]);
   const hasWinnerRecords = preferredWinnerBattles.length > 0;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const previewOnboarding = params.get("previewOnboarding") === "1";
+    const previewMilestone = params.get("previewMilestone") === "1";
+
+    if (previewOnboarding) {
+      setIsOnboardingPreviewMode(true);
+      setIsOnboardingOpen(true);
+    }
+    if (previewMilestone) {
+      setIsMilestoneModalOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOnboardingPreviewMode) {
+      setIsOnboardingOpen(true);
+      return;
+    }
+
+    if (!user?.id || !token) {
+      setIsOnboardingOpen(false);
+      return;
+    }
+
+    let active = true;
+    const loadOnboardingStatus = async () => {
+      try {
+        const response = await fetch("/api/auth/profile-preferences", {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !active) return;
+
+        const onboardingComplete = Boolean(data?.preferences?.onboardingComplete);
+        const snoozeUntilRaw = data?.preferences?.onboardingSnoozeUntil;
+        const snoozeUntilMs = snoozeUntilRaw ? new Date(snoozeUntilRaw).getTime() : 0;
+        const shouldShow = !onboardingComplete && (Number.isNaN(snoozeUntilMs) || Date.now() >= snoozeUntilMs);
+        setIsOnboardingOpen(shouldShow);
+
+        updateUser({
+          ...user,
+          onboardingComplete,
+          onboardingSnoozeUntil: snoozeUntilRaw || null,
+        });
+      } catch {
+        // Silent fallback: if request fails, do not block the app.
+      }
+    };
+
+    void loadOnboardingStatus();
+    return () => {
+      active = false;
+    };
+  }, [user?.id, token, isOnboardingPreviewMode]);
+
+  useEffect(() => {
+    if (isOnboardingOpen) onboardingActionLockRef.current = false;
+  }, [isOnboardingOpen]);
 
   useEffect(() => {
     if (!user) {
@@ -198,6 +297,7 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
 
   // Show daily update first (if present and unseen), then preserve winner modal behavior.
   useEffect(() => {
+    if (isOnboardingOpen) return;
     if (!isPageReadyForPopups || dailyUpdatesLoading) return;
     const hasGlobalUpdate = Boolean(latestUpdate?.message);
     const popupScopeKey = [
@@ -226,6 +326,7 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
     latestUpdate?.updatedAt,
     latestUpdate?.message,
     isPageReadyForPopups,
+    isOnboardingOpen,
   ]);
 
   const handleCountrySelect = (country) => {
@@ -241,9 +342,17 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
     if (section === 'recent-battles') {
       setIsRecentBattlesOpen(!isRecentBattlesOpen);
       setIsContactOpen(false);
+      setIsTopAchieversOpen(false);
     } else if (section === 'contact') {
       setIsContactOpen(!isContactOpen);
       setIsRecentBattlesOpen(false);
+      setIsTopAchieversOpen(false);
+    } else if (section === 'top-achievers') {
+      setIsTopAchieversOpen(!isTopAchieversOpen);
+      setIsRecentBattlesOpen(false);
+      setIsContactOpen(false);
+    } else if (section === "share-milestone") {
+      setIsMilestoneModalOpen(true);
     } else if (section === 'admin') {
       onOpenAdmin?.();
     }
@@ -291,7 +400,7 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
             </div>
 
             {/* Column 2: Streaming Map (Center) */}
-            <div className="lg:h-full lg:min-h-0 flex flex-col gap-4 lg:overflow-hidden">
+            <div id="onboarding-center-section" className="lg:h-full lg:min-h-0 flex flex-col gap-4 lg:overflow-hidden">
               <CountryDropdown
                 selectedCountry={selectedCountry}
                 onSelect={handleCountrySelect}
@@ -302,10 +411,10 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
             </div>
 
             {/* Column 3: Live Battle Cards (Right) */}
-            <div className="flex flex-col gap-2 lg:h-full lg:min-h-0 lg:overflow-hidden">
-              <div className="min-h-[32px] shrink-0 px-1 grid grid-cols-1 xl:grid-cols-[auto_1fr] items-start gap-1 xl:gap-2">
+            <div id="onboarding-live-battles" className="flex flex-col gap-2 lg:h-full lg:min-h-0 lg:overflow-hidden">
+              <div className="min-h-[32px] shrink-0 px-1 grid grid-cols-1 xl:grid-cols-[auto_1fr] items-end gap-1 xl:gap-2">
                 <h2 className="text-lg font-black text-[var(--accent)] uppercase tracking-[0.12em] sm:tracking-widest leading-none whitespace-nowrap">Live Battles</h2>
-                <p className="min-w-0 text-[9px] sm:text-[9px] font-black uppercase tracking-wide text-[var(--text-secondary)] leading-tight text-left xl:text-right whitespace-normal break-words">
+                <p className="min-w-0 text-[10px] sm:text-[11px] font-black uppercase tracking-wide text-[var(--text-secondary)] leading-tight text-left xl:text-right whitespace-normal break-words">
                   {isExpired ? (
                     <>
                       <span>Time left for reset:</span>
@@ -314,7 +423,12 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
                       </span>
                     </>
                   ) : (
-                    "Battle begins on: March 20, 2026 13:00 KST"
+                    <>
+                      <span className="block">Battle begins on:</span>
+                      <span className="block text-[12px] sm:text-[14px] font-extrabold tracking-wider text-[var(--accent)]">
+                        March 20, 2026 13:00 KST
+                      </span>
+                    </>
                   )}
                 </p>
               </div>
@@ -329,28 +443,45 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
       </section>
 
       {/* Far Right: Vertical Tabs */}
-      <VerticalTabs onToggleSection={handleToggleSection} />
+      <div id="onboarding-quick-actions">
+        <VerticalTabs onToggleSection={handleToggleSection} />
+      </div>
 
       {/* Overlay for Drawers */}
-      {(isRecentBattlesOpen || isContactOpen) && (
+      {(isRecentBattlesOpen || isContactOpen || isTopAchieversOpen) && (
         <div 
           className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[90] transition-opacity duration-300"
           onClick={() => {
             setIsRecentBattlesOpen(false);
             setIsContactOpen(false);
+            setIsTopAchieversOpen(false);
           }}
         />
       )}
 
       {/* Drawers (Updated to be controlled by Home state) */}
-      <div className={`fixed top-0 left-0 h-full z-[100] transform transition-transform duration-300 ease-in-out
-                      ${isRecentBattlesOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <RecentResultsDrawer onClose={() => setIsRecentBattlesOpen(false)} />
+      <div className={`fixed top-0 right-0 h-full z-[100] transform transition-all duration-300 ease-in-out
+                      ${isRecentBattlesOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none"}`}>
+        <div id="onboarding-recent-drawer" className="h-full">
+          <RecentResultsDrawer onClose={() => setIsRecentBattlesOpen(false)} />
+        </div>
       </div>
 
-      <div className={`fixed top-0 right-0 h-full z-[100] transform transition-transform duration-300 ease-in-out
-                      ${isContactOpen ? "translate-x-0" : "translate-x-full"}`}>
-        <SupportDrawer onClose={() => setIsContactOpen(false)} />
+      <div className={`fixed top-0 right-0 h-full z-[100] transform transition-all duration-300 ease-in-out
+                      ${isContactOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none"}`}>
+        <div id="onboarding-support-drawer" className="h-full">
+          <SupportDrawer onClose={() => setIsContactOpen(false)} />
+        </div>
+      </div>
+
+      <div className={`fixed top-0 right-0 h-full z-[100] transform transition-all duration-300 ease-in-out
+                      ${isTopAchieversOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0 pointer-events-none"}`}>
+        <div id="onboarding-top10-drawer" className="h-full">
+          <TopAchieversDrawer
+            isOpen={isTopAchieversOpen}
+            onClose={() => setIsTopAchieversOpen(false)}
+          />
+        </div>
       </div>
 
       {isModalOpen && (
@@ -382,6 +513,116 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
               setQueueWinnerAfterUpdate(false);
             }
           }}
+        />
+      )}
+
+      {isOnboardingOpen && (
+        <OnboardingModal
+          isOpen={isOnboardingOpen}
+          user={user}
+          onStepChange={(tourStep) => {
+            if (tourStep === 4) {
+              setIsRecentBattlesOpen(true);
+              setIsTopAchieversOpen(false);
+              setIsContactOpen(false);
+              return;
+            }
+            if (tourStep === 5) {
+              setIsRecentBattlesOpen(false);
+              setIsTopAchieversOpen(true);
+              setIsContactOpen(false);
+              return;
+            }
+            if (tourStep === 6) {
+              setIsRecentBattlesOpen(false);
+              setIsTopAchieversOpen(false);
+              setIsContactOpen(true);
+              return;
+            }
+            setIsRecentBattlesOpen(false);
+            setIsTopAchieversOpen(false);
+            setIsContactOpen(false);
+          }}
+          onComplete={() => {
+            if (!token) return;
+            if (onboardingActionLockRef.current) return;
+            onboardingActionLockRef.current = true;
+            (async () => {
+              try {
+                const response = await fetch("/api/auth/profile-preferences", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    onboardingComplete: true,
+                    onboardingSnoozeUntil: null,
+                  }),
+                });
+                if (response.ok) {
+                  updateUser({
+                    ...user,
+                    onboardingComplete: true,
+                    onboardingSnoozeUntil: null,
+                  });
+                }
+              } catch {
+                // No-op on transient network error.
+              } finally {
+                setIsOnboardingOpen(false);
+                setIsRecentBattlesOpen(false);
+                setIsTopAchieversOpen(false);
+                setIsContactOpen(false);
+                toast.show("Onboarding completed. You are all set.", "success");
+              }
+            })();
+          }}
+          onRemindLater={() => {
+            if (!token) return;
+            if (onboardingActionLockRef.current) return;
+            onboardingActionLockRef.current = true;
+            const next = new Date(Date.now() + (24 * 60 * 60 * 1000));
+            (async () => {
+              try {
+                const response = await fetch("/api/auth/profile-preferences", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                  },
+                  body: JSON.stringify({
+                    onboardingComplete: false,
+                    onboardingSnoozeUntil: next.toISOString(),
+                  }),
+                });
+                if (response.ok) {
+                  updateUser({
+                    ...user,
+                    onboardingComplete: false,
+                    onboardingSnoozeUntil: next.toISOString(),
+                  });
+                }
+              } catch {
+                // No-op on transient network error.
+              } finally {
+                setIsOnboardingOpen(false);
+                setIsRecentBattlesOpen(false);
+                setIsTopAchieversOpen(false);
+                setIsContactOpen(false);
+              }
+            })();
+          }}
+        />
+      )}
+
+      {isMilestoneModalOpen && (
+        <ShareMilestoneModal
+          isOpen={isMilestoneModalOpen}
+          onClose={() => setIsMilestoneModalOpen(false)}
+          user={user}
+          selectedCountry={selectedCountry}
+          isExpired={isExpired}
         />
       )}
     </div>

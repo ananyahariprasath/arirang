@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import Header from "../components/layout/Header";
 import useBattles from "../hooks/useBattles";
 import useTimeline from "../hooks/useTimeline";
@@ -293,6 +293,20 @@ function AdminPanel() {
   const [topScrobblers, setTopScrobblers] = useState([]);
   const [topScrobblersLoading, setTopScrobblersLoading] = useState(false);
   const [topScrobblersError, setTopScrobblersError] = useState("");
+  const [customNotifDraft, setCustomNotifDraft] = useState({
+    message: "",
+    level: "info",
+    durationHours: 0,
+    durationMinutes: 30,
+    durationSeconds: 0,
+    scheduleAt: "",
+  });
+  const [customNotifSending, setCustomNotifSending] = useState(false);
+  const [activeBattleNotification, setActiveBattleNotification] = useState(null);
+  const [activeBattleNotificationSource, setActiveBattleNotificationSource] = useState("");
+  const [activeBattleNotificationLoading, setActiveBattleNotificationLoading] = useState(false);
+  const [cancelCustomNotifLoading, setCancelCustomNotifLoading] = useState(false);
+  const [scheduledBattleNotifications, setScheduledBattleNotifications] = useState([]);
   const { battles, liveBattles, addBattle, updateBattle, updateLiveBattles, deleteBattle, clearBattles, resetLiveBattles, loading: battlesLoading } = useBattles();
   const { events, addEvent, updateEvent, deleteEvent, clearTimeline, resetToDefault, loading: timelineLoading } = useTimeline();
   const { regions, addRegion, deleteRegion, resetRegions, loading: regionsLoading } = useRegionalData();
@@ -301,6 +315,7 @@ function AdminPanel() {
   const { updates, latestUpdate, addUpdate, deleteUpdate, clearUpdates, loading: updatesLoading } = useDailyUpdates();
   const toast = useToast();
   const { token } = useAuth();
+  const lastBattleNotificationIdRef = useRef("");
 
   const isDataLoading = regionsLoading || modsLoading || battlesLoading || timelineLoading || galleryLoading || updatesLoading;
   
@@ -352,6 +367,34 @@ function AdminPanel() {
   const [editingEvent, setEditingEvent] = useState(null);
   const [dailyUpdateDraft, setDailyUpdateDraft] = useState({ title: "", message: "", imageUrl: "", quote: "", uploadedImageData: "", uploadedImageName: "" });
   const [previewUpdateId, setPreviewUpdateId] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const checkBattleNotifications = async () => {
+      try {
+        const response = await fetch("/api/auth/battle-notifications", { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        if (!active || !response.ok) return;
+
+        const notification = data?.active;
+        if (!notification?.id) return;
+        if (lastBattleNotificationIdRef.current === notification.id) return;
+
+        lastBattleNotificationIdRef.current = notification.id;
+        toast.show(notification.message || "Battle update available", notification.level === "success" ? "success" : "info");
+      } catch {
+        // Intentionally silent to avoid noisy UX when network is unstable.
+      }
+    };
+
+    checkBattleNotifications();
+    const intervalId = setInterval(checkBattleNotifications, 45 * 1000);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [toast]);
 
   useEffect(() => {
     setLiveEdits(liveBattles);
@@ -614,6 +657,144 @@ function AdminPanel() {
     }
   };
 
+  const handleSendCustomNotification = async (e) => {
+    e.preventDefault();
+    if (!token || customNotifSending) return;
+
+    const message = String(customNotifDraft.message || "").trim();
+    const durationHours = Number.parseInt(String(customNotifDraft.durationHours || "0"), 10);
+    const durationMinutes = Number.parseInt(String(customNotifDraft.durationMinutes || "0"), 10);
+    const durationSeconds = Number.parseInt(String(customNotifDraft.durationSeconds || "0"), 10);
+    const level = String(customNotifDraft.level || "info").toLowerCase();
+    const h = Number.isFinite(durationHours) ? Math.max(0, Math.min(24, durationHours)) : 0;
+    const m = Number.isFinite(durationMinutes) ? Math.max(0, Math.min(59, durationMinutes)) : 0;
+    const s = Number.isFinite(durationSeconds) ? Math.max(0, Math.min(59, durationSeconds)) : 0;
+    const totalDurationSeconds = (h * 3600) + (m * 60) + s;
+    const scheduleAt = String(customNotifDraft.scheduleAt || "").trim();
+
+    if (!message) {
+      toast.show("Please enter a notification message", "error");
+      return;
+    }
+    if (totalDurationSeconds <= 0) {
+      toast.show("Please set a duration using hours, minutes, or seconds", "error");
+      return;
+    }
+
+    setCustomNotifSending(true);
+    try {
+      const response = await fetch("/api/auth/battle-notifications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          message,
+          level,
+          durationHours: h,
+          durationMinutes: m,
+          durationSeconds: s,
+          scheduleAt: scheduleAt || undefined,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to send notification");
+      }
+
+      toast.show(data?.mode === "scheduled" ? "Notification scheduled." : "Custom notification sent.", "success");
+      setCustomNotifDraft((prev) => ({ ...prev, message: "", scheduleAt: "" }));
+      await loadActiveBattleNotification(true);
+    } catch (error) {
+      toast.show(error.message || "Failed to send notification", "error");
+    } finally {
+      setCustomNotifSending(false);
+    }
+  };
+
+  const loadActiveBattleNotification = async (silent = false) => {
+    if (!token) return;
+    if (!silent) setActiveBattleNotificationLoading(true);
+    try {
+      const response = await fetch("/api/auth/battle-notifications?adminView=1", {
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to load active notification");
+      }
+      setActiveBattleNotification(data?.active || null);
+      setActiveBattleNotificationSource(String(data?.source || ""));
+      setScheduledBattleNotifications(Array.isArray(data?.scheduled) ? data.scheduled : []);
+    } catch (error) {
+      if (!silent) toast.show(error.message || "Failed to load active notification", "error");
+    } finally {
+      if (!silent) setActiveBattleNotificationLoading(false);
+    }
+  };
+
+  const handleCancelCustomNotification = async () => {
+    if (!token || cancelCustomNotifLoading) return;
+    if (!activeBattleNotification?.id || !String(activeBattleNotification.id).startsWith("custom:")) {
+      toast.show("No active custom notification to cancel.", "info");
+      return;
+    }
+
+    setCancelCustomNotifLoading(true);
+    try {
+      const response = await fetch("/api/auth/battle-notifications", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id: activeBattleNotification.id }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to cancel notification");
+      }
+
+      toast.show("Custom notification cancelled.", "success");
+      await loadActiveBattleNotification(true);
+    } catch (error) {
+      toast.show(error.message || "Failed to cancel notification", "error");
+    } finally {
+      setCancelCustomNotifLoading(false);
+    }
+  };
+
+  const handleCancelQueuedNotification = async (id) => {
+    if (!token || cancelCustomNotifLoading) return;
+    const cleanId = String(id || "").trim();
+    if (!cleanId.startsWith("custom:")) return;
+
+    setCancelCustomNotifLoading(true);
+    try {
+      const response = await fetch("/api/auth/battle-notifications", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ id: cleanId }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to cancel notification");
+      }
+
+      toast.show("Scheduled notification cancelled.", "success");
+      await loadActiveBattleNotification(true);
+    } catch (error) {
+      toast.show(error.message || "Failed to cancel notification", "error");
+    } finally {
+      setCancelCustomNotifLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab !== "battles") return;
 
@@ -641,6 +822,26 @@ function AdminPanel() {
 
     loadTopScrobblers();
     const intervalId = setInterval(loadTopScrobblers, 60000);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [activeTab, token]);
+
+  useEffect(() => {
+    if (activeTab !== "battles") return;
+
+    let active = true;
+    const load = async (silent = false) => {
+      if (!active) return;
+      await loadActiveBattleNotification(silent);
+    };
+
+    void load(false);
+    const intervalId = setInterval(() => {
+      void load(true);
+    }, 20000);
+
     return () => {
       active = false;
       clearInterval(intervalId);
@@ -803,6 +1004,143 @@ function AdminPanel() {
 
         {activeTab === "battles" && (
           <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-[var(--card-bg)]/60 backdrop-blur-xl border border-[var(--accent)]/30 rounded-3xl p-4 sm:p-5 mb-5">
+              <h3 className="text-base sm:text-lg font-black text-[var(--accent)] uppercase tracking-tight mb-3">Send Battle Notification</h3>
+              <form onSubmit={handleSendCustomNotification} className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto_auto] gap-3 items-stretch">
+                <input
+                  type="text"
+                  value={customNotifDraft.message}
+                  onChange={(e) => setCustomNotifDraft((prev) => ({ ...prev, message: e.target.value }))}
+                  placeholder="Write custom message for all users..."
+                  maxLength={240}
+                  className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none focus:border-[var(--accent)]"
+                />
+                <select
+                  value={customNotifDraft.level}
+                  onChange={(e) => setCustomNotifDraft((prev) => ({ ...prev, level: e.target.value }))}
+                  className="bg-[var(--bg-primary)] border border-[var(--accent)]/20 rounded-xl px-3 py-2.5 text-xs font-black uppercase tracking-wider outline-none focus:border-[var(--accent)]"
+                >
+                  <option value="info">Info</option>
+                  <option value="success">Success</option>
+                  <option value="error">Error</option>
+                </select>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min="0"
+                    max="24"
+                    value={customNotifDraft.durationHours}
+                    onChange={(e) => setCustomNotifDraft((prev) => ({ ...prev, durationHours: e.target.value }))}
+                    className="w-16 bg-[var(--bg-primary)] border border-[var(--accent)]/20 rounded-xl px-2 py-2.5 text-xs font-black outline-none focus:border-[var(--accent)]"
+                    title="Hours"
+                  />
+                  <span className="text-[10px] font-black opacity-60">h</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={customNotifDraft.durationMinutes}
+                    onChange={(e) => setCustomNotifDraft((prev) => ({ ...prev, durationMinutes: e.target.value }))}
+                    className="w-16 bg-[var(--bg-primary)] border border-[var(--accent)]/20 rounded-xl px-2 py-2.5 text-xs font-black outline-none focus:border-[var(--accent)]"
+                    title="Minutes"
+                  />
+                  <span className="text-[10px] font-black opacity-60">m</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={customNotifDraft.durationSeconds}
+                    onChange={(e) => setCustomNotifDraft((prev) => ({ ...prev, durationSeconds: e.target.value }))}
+                    className="w-16 bg-[var(--bg-primary)] border border-[var(--accent)]/20 rounded-xl px-2 py-2.5 text-xs font-black outline-none focus:border-[var(--accent)]"
+                    title="Seconds"
+                  />
+                  <span className="text-[10px] font-black opacity-60">s</span>
+                </div>
+                <input
+                  type="datetime-local"
+                  value={customNotifDraft.scheduleAt}
+                  onChange={(e) => setCustomNotifDraft((prev) => ({ ...prev, scheduleAt: e.target.value }))}
+                  className="bg-[var(--bg-primary)] border border-[var(--accent)]/20 rounded-xl px-3 py-2.5 text-xs font-black outline-none focus:border-[var(--accent)]"
+                  title="Schedule time (optional)"
+                />
+                <button
+                  type="submit"
+                  disabled={customNotifSending}
+                  className="px-4 py-2.5 rounded-xl border border-[var(--accent)]/40 bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent)]/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {customNotifSending ? "Sending..." : "Send"}
+                </button>
+              </form>
+              <p className="mt-2 text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">
+                Visible to all users. Set duration using hours/minutes/seconds. Optional schedule time sends later.
+              </p>
+              <div className="mt-3 border border-[var(--accent)]/20 rounded-2xl p-3 bg-[var(--bg-primary)]/40">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Active Notification Preview</p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void loadActiveBattleNotification(false)}
+                      className="px-3 py-1.5 rounded-lg border border-[var(--accent)]/30 text-[var(--accent)] text-[9px] font-black uppercase tracking-widest hover:bg-[var(--accent)]/10 transition-all"
+                    >
+                      Refresh
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelCustomNotification}
+                      disabled={cancelCustomNotifLoading || !activeBattleNotification?.id || !String(activeBattleNotification.id).startsWith("custom:")}
+                      className="px-3 py-1.5 rounded-lg border border-red-500/40 text-red-400 text-[9px] font-black uppercase tracking-widest hover:bg-red-500/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {cancelCustomNotifLoading ? "Cancelling..." : "Cancel Now"}
+                    </button>
+                  </div>
+                </div>
+                {activeBattleNotificationLoading ? (
+                  <p className="mt-2 text-xs font-bold text-[var(--text-secondary)]">Loading active notification...</p>
+                ) : activeBattleNotification ? (
+                  <div className="mt-2">
+                    <p className="text-xs font-black">
+                      [{String(activeBattleNotificationSource || "automatic").toUpperCase()}] {activeBattleNotification.message}
+                    </p>
+                    <p className="text-[10px] mt-1 font-bold uppercase tracking-widest text-[var(--text-secondary)]">
+                      Level: {String(activeBattleNotification.level || "info")} {activeBattleNotification.endsAt ? `| Ends: ${new Date(activeBattleNotification.endsAt).toLocaleString()}` : ""}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs font-bold text-[var(--text-secondary)]">No active notification.</p>
+                )}
+              </div>
+              <div className="mt-3 border border-[var(--accent)]/20 rounded-2xl p-3 bg-[var(--bg-primary)]/40">
+                <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Scheduled Notifications</p>
+                {scheduledBattleNotifications.length === 0 ? (
+                  <p className="mt-2 text-xs font-bold text-[var(--text-secondary)]">No scheduled notifications.</p>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    {scheduledBattleNotifications.map((item) => (
+                      <div key={item.id} className="rounded-xl border border-[var(--accent)]/15 bg-[var(--card-bg)]/40 p-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-black">{item.message}</p>
+                            <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)]">
+                              Level: {String(item.level || "info")} | Starts: {item.startsAt ? new Date(item.startsAt).toLocaleString() : "N/A"}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => void handleCancelQueuedNotification(item.id)}
+                            disabled={cancelCustomNotifLoading}
+                            className="px-2.5 py-1 rounded-lg border border-red-500/40 text-red-400 text-[9px] font-black uppercase tracking-widest hover:bg-red-500/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="bg-[var(--card-bg)]/60 backdrop-blur-xl border border-[var(--accent)]/30 rounded-3xl p-4 sm:p-5 mb-8">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
                 <h3 className="text-base sm:text-lg font-black text-[var(--accent)] uppercase tracking-tight">Top 10 Scrobblers (Today)</h3>
@@ -1987,7 +2325,6 @@ function AdminPanel() {
   );
 }
 
-// Sub-component for individual mod cards to handle local editing state
 function ModCard({ mod, onToggle, onUpdate, toast }) {
   const [localName, setLocalName] = useState(mod.name);
   const [localAccounts, setLocalAccounts] = useState([...(mod.accounts || [])]);

@@ -81,6 +81,17 @@ function IconLogout({ className = "w-4 h-4" }) {
   );
 }
 
+function IconShare({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <path d="M8.8 10.7l6.5-3.5M8.8 13.3l6.5 3.5" />
+    </svg>
+  );
+}
+
 
 function Header({ onToggleSection }) {
   const { toggleTheme, theme } = useTheme();
@@ -294,7 +305,7 @@ function Header({ onToggleSection }) {
           </div>
 
           {/* Center: Website Name */}
-          <div className="flex-1 min-w-0 xl:absolute xl:left-1/2 xl:-translate-x-1/2 xl:w-max text-center pointer-events-none px-2 xl:px-6">
+          <div className="flex-1 min-w-0 text-center pointer-events-none px-2 xl:px-6">
             <h1 className="block text-[11px] sm:text-base lg:text-2xl xl:text-3xl font-black tracking-[0.08em] sm:tracking-widest xl:tracking-[0.2em] uppercase text-[var(--accent)] pointer-events-auto leading-tight whitespace-normal lg:whitespace-nowrap break-words">
               ARIRANG SPOTIFY TAKEOVER!!!
             </h1>
@@ -391,6 +402,16 @@ function Header({ onToggleSection }) {
                       <span className="text-xs text-[var(--text-secondary)] capitalize">{theme}</span>
                     </button>
 
+                    <button
+                      onClick={() => {
+                        setIsProfileDropdownOpen(false);
+                        if (onToggleSection) onToggleSection("share-milestone");
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--accent)]/10 transition-colors flex items-center gap-2"
+                    >
+                      <IconShare /> Share Milestone
+                    </button>
+
                     {user?.role === "admin" && (
                       <button
                         onClick={() => {
@@ -419,7 +440,7 @@ function Header({ onToggleSection }) {
               </div>
             )}
 
-            <div className="relative" ref={translateRef}>
+            <div id="onboarding-header-translate" className="relative" ref={translateRef}>
               <button
                 onClick={() => {
                   setIsTranslateOpen((prev) => !prev);
@@ -470,6 +491,7 @@ function Header({ onToggleSection }) {
                 </div>
               )}
             </div>
+
           </div>
 
           {/* Right Section - Mobile Hamburger */}
@@ -563,6 +585,21 @@ function Header({ onToggleSection }) {
                     Recent Battles
                   </button>
 
+                  {/* Mobile Top Achievers Button */}
+                  <button
+                    onClick={() => {
+                      if (onToggleSection) onToggleSection('top-achievers');
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full px-5 py-3 text-[10px] font-black rounded-xl
+                     bg-[var(--card-bg)]/60 
+                     border border-[var(--accent)]/40
+                     hover:bg-[var(--accent)]/10
+                     transition-all duration-300 tracking-widest uppercase"
+                  >
+                    Top 10 Achievers
+                  </button>
+
                   {/* Mobile Support Button */}
                   <button
                     onClick={() => {
@@ -591,6 +628,16 @@ function Header({ onToggleSection }) {
                         className="w-full px-5 py-3 text-[10px] font-black rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all flex items-center justify-center gap-2 tracking-widest uppercase"
                       >
                         <IconCamera /> Profile Pic
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          if (onToggleSection) onToggleSection("share-milestone");
+                        }}
+                        className="w-full px-5 py-3 text-[10px] font-black rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all flex items-center justify-center gap-2 tracking-widest uppercase"
+                      >
+                        <IconShare /> Share Milestone
                       </button>
 
                       {user?.role === "admin" && (

@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
 
+const USERNAME_REGEX = /^[A-Za-z0-9_]+$/;
+const STRONG_PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+
 function AuthModal({ isOpen, onClose }) {
   const [mode, setMode] = useState("login"); // login, signup, forgot, verify-otp, reset
   const [email, setEmail] = useState("");
@@ -50,12 +53,21 @@ function AuthModal({ isOpen, onClose }) {
   const handleSignup = async (e) => {
     e.preventDefault();
     setError("");
+    const normalizedUsername = String(username || "").trim();
+    if (!USERNAME_REGEX.test(normalizedUsername)) {
+      setError("Username can contain only letters, numbers, and underscore (_) with no spaces.");
+      return;
+    }
+    if (!STRONG_PASSWORD_REGEX.test(String(password || ""))) {
+      setError("Password must be at least 8 characters and include 1 uppercase letter, 1 number, and 1 symbol.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, username }),
+        body: JSON.stringify({ email, password, username: normalizedUsername }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -179,6 +191,9 @@ function AuthModal({ isOpen, onClose }) {
             <div>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" required className="w-full px-4 py-3 rounded-xl bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 focus:border-[var(--accent)] outline-none transition-colors text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/50" />
             </div>
+            <p className="text-[10px] text-[var(--text-secondary)]/80 -mt-2">
+              Min 8 chars, at least 1 uppercase, 1 number, and 1 symbol.
+            </p>
             {error && <p className="text-red-400 text-sm mt-2 ml-1">{error}</p>}
             <button type="submit" disabled={loading} className="w-full px-4 py-3 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/80 transition-colors font-semibold shadow-lg shadow-[var(--accent)]/20">
               {loading ? "Signing up..." : "Sign Up"}

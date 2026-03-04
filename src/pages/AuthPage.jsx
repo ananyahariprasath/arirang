@@ -4,6 +4,9 @@ import HelpDeskModal from "../components/modals/HelpDeskModal";
 import AuthLogo from "../components/branding/AuthLogo";
 import { COUNTRIES, COUNTRY_REGION_MAP } from "../constants";
 
+const USERNAME_REGEX = /^[A-Za-z0-9_]+$/;
+const STRONG_PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+
 function AuthPage() {
   const [mode, setMode] = useState("login"); // login, signup, forgot, verify-otp, reset
   const [email, setEmail] = useState("");
@@ -17,9 +20,24 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [usernameError, setUsernameError] = useState("");
 
   const { login } = useAuth();
   const inputRef = useRef(null);
+  const signupPasswordChecks = {
+    minLength: String(password || "").length >= 8,
+    uppercase: /[A-Z]/.test(String(password || "")),
+    lowercase: /[a-z]/.test(String(password || "")),
+    number: /\d/.test(String(password || "")),
+    symbol: /[^A-Za-z0-9]/.test(String(password || "")),
+  };
+  const resetPasswordChecks = {
+    minLength: String(newPassword || "").length >= 8,
+    uppercase: /[A-Z]/.test(String(newPassword || "")),
+    lowercase: /[a-z]/.test(String(newPassword || "")),
+    number: /\d/.test(String(newPassword || "")),
+    symbol: /[^A-Za-z0-9]/.test(String(newPassword || "")),
+  };
 
   useEffect(() => {
     if (inputRef.current) {
@@ -52,8 +70,20 @@ function AuthPage() {
 
   const handleSignup = async (e) => {
     e.preventDefault();
+    setUsernameError("");
     if (!email || !password || !username || !signupCountry) {
       setError("Please fill in all fields.");
+      return;
+    }
+    const normalizedUsername = String(username || "").trim();
+    if (!USERNAME_REGEX.test(normalizedUsername)) {
+      const usernameValidationError = "Username can contain only letters, numbers, and underscore (_) with no spaces.";
+      setUsernameError(usernameValidationError);
+      setError(usernameValidationError);
+      return;
+    }
+    if (!STRONG_PASSWORD_REGEX.test(String(password || ""))) {
+      setError("Password must be at least 8 characters and include 1 uppercase letter, 1 lowercase letter, 1 number, and 1 symbol.");
       return;
     }
     setLoading(true);
@@ -63,7 +93,7 @@ function AuthPage() {
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, username, country: signupCountry, region })
+        body: JSON.stringify({ email, password, username: normalizedUsername, country: signupCountry, region })
       });
       const data = await res.json();
       if (res.ok) {
@@ -128,6 +158,10 @@ function AuthPage() {
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setError("");
+    if (!STRONG_PASSWORD_REGEX.test(String(newPassword || ""))) {
+      setError("Password must be at least 8 characters and include 1 uppercase letter, 1 lowercase letter, 1 number, and 1 symbol.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/reset-password", {
@@ -193,8 +227,25 @@ function AuthPage() {
         return (
           <form onSubmit={handleSignup} className="space-y-6 w-full max-w-sm">
             <div>
-              <input ref={inputRef} type="text" value={username} onChange={e => setUsername(e.target.value)} placeholder="Username" required className="w-full px-5 py-4 rounded-2xl bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 focus:border-[var(--accent)] outline-none transition-colors text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/50 text-lg shadow-inner" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={username}
+                onChange={e => {
+                  const value = e.target.value;
+                  setUsername(value);
+                  if (!value || USERNAME_REGEX.test(value)) {
+                    setUsernameError("");
+                  } else {
+                    setUsernameError("Username can contain only letters, numbers, and underscore (_) with no spaces.");
+                  }
+                }}
+                placeholder="Username"
+                required
+                className="w-full px-5 py-4 rounded-2xl bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 focus:border-[var(--accent)] outline-none transition-colors text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/50 text-lg shadow-inner"
+              />
             </div>
+            {usernameError && <p className="text-red-400 text-sm -mt-3 ml-1">{usernameError}</p>}
             <div>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" required className="w-full px-5 py-4 rounded-2xl bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 focus:border-[var(--accent)] outline-none transition-colors text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/50 text-lg shadow-inner" />
             </div>
@@ -216,6 +267,23 @@ function AuthPage() {
                 {showPassword ? "👁️" : "🫣"}
               </button>
             </div>
+            {password && <div className="-mt-2 space-y-1">
+              <p className={`text-xs ${signupPasswordChecks.minLength ? "text-emerald-400" : "text-[var(--text-secondary)]/80"}`}>
+                <span className="inline-block w-4">{signupPasswordChecks.minLength ? "✓" : "○"}</span> At least 8 characters
+              </p>
+              <p className={`text-xs ${signupPasswordChecks.uppercase ? "text-emerald-400" : "text-[var(--text-secondary)]/80"}`}>
+                <span className="inline-block w-4">{signupPasswordChecks.uppercase ? "✓" : "○"}</span> One uppercase letter
+              </p>
+              <p className={`text-xs ${signupPasswordChecks.lowercase ? "text-emerald-400" : "text-[var(--text-secondary)]/80"}`}>
+                <span className="inline-block w-4">{signupPasswordChecks.lowercase ? "✓" : "○"}</span> One lowercase letter
+              </p>
+              <p className={`text-xs ${signupPasswordChecks.number ? "text-emerald-400" : "text-[var(--text-secondary)]/80"}`}>
+                <span className="inline-block w-4">{signupPasswordChecks.number ? "✓" : "○"}</span> One number
+              </p>
+              <p className={`text-xs ${signupPasswordChecks.symbol ? "text-emerald-400" : "text-[var(--text-secondary)]/80"}`}>
+                <span className="inline-block w-4">{signupPasswordChecks.symbol ? "✓" : "○"}</span> One symbol
+              </p>
+            </div>}
             <div>
               <select 
                 value={signupCountry} 
@@ -295,6 +363,23 @@ function AuthPage() {
                 {showPassword ? "👁️" : "🫣"}
               </button>
             </div>
+            {newPassword && <div className="-mt-2 space-y-1">
+              <p className={`text-xs ${resetPasswordChecks.minLength ? "text-emerald-400" : "text-[var(--text-secondary)]/80"}`}>
+                <span className="inline-block w-4">{resetPasswordChecks.minLength ? "✓" : "○"}</span> At least 8 characters
+              </p>
+              <p className={`text-xs ${resetPasswordChecks.uppercase ? "text-emerald-400" : "text-[var(--text-secondary)]/80"}`}>
+                <span className="inline-block w-4">{resetPasswordChecks.uppercase ? "✓" : "○"}</span> One uppercase letter
+              </p>
+              <p className={`text-xs ${resetPasswordChecks.lowercase ? "text-emerald-400" : "text-[var(--text-secondary)]/80"}`}>
+                <span className="inline-block w-4">{resetPasswordChecks.lowercase ? "✓" : "○"}</span> One lowercase letter
+              </p>
+              <p className={`text-xs ${resetPasswordChecks.number ? "text-emerald-400" : "text-[var(--text-secondary)]/80"}`}>
+                <span className="inline-block w-4">{resetPasswordChecks.number ? "✓" : "○"}</span> One number
+              </p>
+              <p className={`text-xs ${resetPasswordChecks.symbol ? "text-emerald-400" : "text-[var(--text-secondary)]/80"}`}>
+                <span className="inline-block w-4">{resetPasswordChecks.symbol ? "✓" : "○"}</span> One symbol
+              </p>
+            </div>}
             {error && <p className="text-red-400 text-sm mt-2 ml-1">{error}</p>}
             <button type="submit" disabled={loading} className="w-full px-5 py-4 rounded-2xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/80 transition-all font-bold tracking-wider text-lg shadow-lg shadow-[var(--accent)]/20 hover:-translate-y-1">
               {loading ? "Resetting..." : "Reset Password"}

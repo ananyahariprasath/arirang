@@ -9,6 +9,9 @@ const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_for_development_on
 const CACHE_TTL_MS = 75 * 1000;
 const MAX_USERS_PER_SYNC = 120;
 const MAX_CONCURRENT_USERS = 3;
+const BATTLE_START_AT_ISO = "2026-03-20T13:00:00+09:00";
+const USERNAME_REGEX = /^[A-Za-z0-9_]+$/;
+const STRONG_PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Credentials", "true");
@@ -48,6 +51,21 @@ function verifyAdminRequest(req, res) {
   }
 }
 
+function verifyUserRequest(req, res) {
+  const token = extractBearerToken(req);
+  if (!token) {
+    res.status(401).json({ error: "Unauthorized" });
+    return null;
+  }
+
+  try {
+    return jwt.verify(token, JWT_SECRET);
+  } catch {
+    res.status(401).json({ error: "Invalid token" });
+    return null;
+  }
+}
+
 function generateSignature(params, secret) {
   const sortedKeys = Object.keys(params).sort();
   let signature = "";
@@ -71,6 +89,92 @@ function toResetKeyUTC(now = new Date()) {
   const month = String(now.getUTCMonth() + 1).padStart(2, "0");
   const day = String(now.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function getAutomaticBattleNotification(now = new Date()) {
+  const startsAt = new Date(BATTLE_START_AT_ISO);
+  const diffMs = startsAt.getTime() - now.getTime();
+  const campaignId = startsAt.toISOString();
+  let active = null;
+
+  if (diffMs <= 0) {
+    active = {
+      id: `${campaignId}:live`,
+      phase: "live",
+      message: "Battle is live now. Start streaming.",
+      level: "success",
+    };
+  } else if (diffMs <= 15 * 60 * 1000) {
+    active = {
+      id: `${campaignId}:15m`,
+      phase: "15m",
+      message: "Battle starts in 15 minutes. Get ready now.",
+      level: "info",
+    };
+  } else if (diffMs <= 60 * 60 * 1000) {
+    active = {
+      id: `${campaignId}:1h`,
+      phase: "1h",
+      message: "Battle starts in 1 hour. Final prep time.",
+      level: "info",
+    };
+  } else if (diffMs <= 24 * 60 * 60 * 1000) {
+    active = {
+      id: `${campaignId}:24h`,
+      phase: "24h",
+      message: "Battle starts in 24 hours. Prepare your streaming team.",
+      level: "info",
+    };
+  }
+
+  return { startsAt: startsAt.toISOString(), active };
+}
+
+async function getBattleNotificationPayload(now = new Date()) {
+  const auto = getAutomaticBattleNotification(now);
+
+  let customActive = null;
+  try {
+    const db = await getDb();
+    const customCollection = db.collection("battle_notifications");
+    const custom = await customCollection.findOne(
+      {
+        status: { $in: ["active", "scheduled"] },
+        startsAt: { $lte: now },
+        endsAt: { $gt: now },
+      },
+      { sort: { createdAt: -1 } }
+    );
+
+    if (custom) {
+      if (String(custom.status || "") === "scheduled") {
+        await customCollection.updateOne(
+          { _id: custom._id, status: "scheduled" },
+          { $set: { status: "active", activatedAt: now } }
+        );
+      }
+      customActive = {
+        id: `custom:${String(custom._id)}`,
+        phase: "custom",
+        message: String(custom.message || "").trim(),
+        level: ["success", "error", "info"].includes(String(custom.level || "").toLowerCase())
+          ? String(custom.level || "").toLowerCase()
+          : "info",
+        startsAt: custom.startsAt ? new Date(custom.startsAt).toISOString() : null,
+        endsAt: custom.endsAt ? new Date(custom.endsAt).toISOString() : null,
+      };
+    }
+  } catch (error) {
+    console.error("Battle notifications custom lookup failed:", error);
+  }
+
+  return {
+    success: true,
+    startsAt: auto.startsAt,
+    serverTime: now.toISOString(),
+    source: customActive ? "custom" : "automatic",
+    active: customActive || auto.active,
+  };
 }
 
 function parsePlaycount(value) {
@@ -158,6 +262,8 @@ async function handleLogin(req, res) {
       lastfmUsername: user.lastfmUsername || null,
       country: user.country || null,
       region: user.region || null,
+      onboardingComplete: Boolean(user.onboardingComplete),
+      onboardingSnoozeUntil: user.onboardingSnoozeUntil || null,
     },
   });
 }
@@ -170,6 +276,19 @@ async function handleSignup(req, res) {
   const { email, password, username, country, region } = req.body || {};
   if (!email || !password || !username || !country || !region) {
     return res.status(400).json({ error: "Email, password, username, country, and region are required" });
+  }
+
+  const normalizedUsername = String(username || "").trim();
+  if (!USERNAME_REGEX.test(normalizedUsername)) {
+    return res.status(400).json({
+      error: "Username can contain only letters, numbers, and underscore (_) with no spaces.",
+    });
+  }
+
+  if (!STRONG_PASSWORD_REGEX.test(String(password || ""))) {
+    return res.status(400).json({
+      error: "Password must be at least 8 characters and include 1 uppercase letter, 1 number, and 1 symbol.",
+    });
   }
 
   const db = await getDb();
@@ -186,11 +305,13 @@ async function handleSignup(req, res) {
   const now = new Date();
   const newUser = {
     email,
-    username,
+    username: normalizedUsername,
     password: hashedPassword,
     country,
     region,
     role: "user",
+    onboardingComplete: false,
+    onboardingSnoozeUntil: null,
     createdAt: now,
   };
 
@@ -214,6 +335,8 @@ async function handleSignup(req, res) {
       region: newUser.region,
       profilePicture: null,
       lastfmUsername: null,
+      onboardingComplete: false,
+      onboardingSnoozeUntil: null,
     },
   });
 }
@@ -426,6 +549,75 @@ async function handleProfilePicture(req, res) {
       lastfmUsername: result.lastfmUsername || null,
       country: result.country || null,
       region: result.region || null,
+      onboardingComplete: Boolean(result.onboardingComplete),
+      onboardingSnoozeUntil: result.onboardingSnoozeUntil || null,
+    },
+  });
+}
+
+async function handleProfilePreferences(req, res) {
+  if (!["GET", "POST"].includes(req.method)) {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const decoded = verifyUserRequest(req, res);
+  if (!decoded) return;
+
+  const db = await getDb();
+  const usersCollection = db.collection("users");
+  const userId = decoded.id;
+
+  let objectId;
+  try {
+    objectId = new ObjectId(userId);
+  } catch {
+    return res.status(400).json({ error: "Invalid user ID format" });
+  }
+
+  if (req.method === "GET") {
+    const user = await usersCollection.findOne(
+      { _id: objectId },
+      { projection: { onboardingComplete: 1, onboardingSnoozeUntil: 1 } }
+    );
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    return res.status(200).json({
+      success: true,
+      preferences: {
+        onboardingComplete: Boolean(user.onboardingComplete),
+        onboardingSnoozeUntil: user.onboardingSnoozeUntil || null,
+      },
+    });
+  }
+
+  const nextComplete = Boolean(req.body?.onboardingComplete);
+  const snoozeInput = req.body?.onboardingSnoozeUntil;
+  let onboardingSnoozeUntil = null;
+
+  if (snoozeInput) {
+    const parsed = new Date(snoozeInput);
+    if (!Number.isNaN(parsed.getTime())) {
+      onboardingSnoozeUntil = parsed;
+    }
+  }
+
+  const result = await usersCollection.findOneAndUpdate(
+    { _id: objectId },
+    {
+      $set: {
+        onboardingComplete: nextComplete,
+        onboardingSnoozeUntil,
+      },
+    },
+    { returnDocument: "after" }
+  );
+  if (!result) return res.status(404).json({ error: "User not found" });
+
+  return res.status(200).json({
+    success: true,
+    preferences: {
+      onboardingComplete: Boolean(result.onboardingComplete),
+      onboardingSnoozeUntil: result.onboardingSnoozeUntil || null,
     },
   });
 }
@@ -766,21 +958,9 @@ async function handleLastfmSyncNow(req, res) {
   });
 }
 
-async function handleTopScrobblers(req, res) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
-  const admin = verifyAdminRequest(req, res);
-  if (!admin) return;
-
+async function fetchTopScrobblerRows({ resetKey, battleId, limit }) {
   const db = await getDb();
   const leaderboardCollection = db.collection("lastfm_user_leaderboard");
-
-  const resetKey = String(req.query?.resetKey || toResetKeyUTC(new Date())).trim();
-  const battleId = String(req.query?.battleId || "").trim();
-  const limitRaw = Number.parseInt(String(req.query?.limit || "10"), 10);
-  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(50, limitRaw)) : 10;
 
   const match = { resetKey };
   if (battleId) {
@@ -808,21 +988,231 @@ async function handleTopScrobblers(req, res) {
     ])
     .toArray();
 
+  return rows.map((row, index) => ({
+    rank: index + 1,
+    userId: row.userId || row._id || "",
+    lastfmUsername: row.lastfmUsername || "",
+    region: row.region || "",
+    albumStreams: Number(row.albumStreams || 0),
+    titleStreams: Number(row.titleStreams || 0),
+    totalStreams: Number(row.totalStreams || 0),
+    battleCount: Number(row.battleCount || 0),
+    updatedAt: row.updatedAt || null,
+  }));
+}
+
+async function handleTopScrobblers(req, res) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const admin = verifyAdminRequest(req, res);
+  if (!admin) return;
+
+  const resetKey = String(req.query?.resetKey || toResetKeyUTC(new Date())).trim();
+  const battleId = String(req.query?.battleId || "").trim();
+  const limitRaw = Number.parseInt(String(req.query?.limit || "10"), 10);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(50, limitRaw)) : 10;
+  const top = await fetchTopScrobblerRows({ resetKey, battleId, limit });
+
   return res.status(200).json({
     success: true,
     resetKey,
     battleId: battleId || null,
-    top: rows.map((row, index) => ({
-      rank: index + 1,
-      userId: row.userId || row._id || "",
-      lastfmUsername: row.lastfmUsername || "",
-      region: row.region || "",
-      albumStreams: Number(row.albumStreams || 0),
-      titleStreams: Number(row.titleStreams || 0),
-      totalStreams: Number(row.totalStreams || 0),
-      battleCount: Number(row.battleCount || 0),
-      updatedAt: row.updatedAt || null,
+    top,
+  });
+}
+
+async function handlePublicTopScrobblers(req, res) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  // Lightweight cache to reduce serverless invocations on Vercel free plan.
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=120");
+
+  const resetKey = String(req.query?.resetKey || toResetKeyUTC(new Date())).trim();
+  const battleId = String(req.query?.battleId || "").trim();
+  const limitRaw = Number.parseInt(String(req.query?.limit || "10"), 10);
+  // Public endpoint supports larger limits for visualizations while still bounded for free-tier safety.
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(500, limitRaw)) : 50;
+  const top = await fetchTopScrobblerRows({ resetKey, battleId, limit });
+
+  return res.status(200).json({
+    success: true,
+    resetKey,
+    battleId: battleId || null,
+    top: top.map((row) => ({
+      rank: row.rank,
+      lastfmUsername: row.lastfmUsername,
+      region: row.region,
+      totalStreams: row.totalStreams,
+      updatedAt: row.updatedAt,
     })),
+  });
+}
+
+async function handleBattleNotifications(req, res) {
+  if (req.method === "GET") {
+    const adminView = String(req.query?.adminView || "").trim() === "1";
+    if (adminView) {
+      const admin = verifyAdminRequest(req, res);
+      if (!admin) return;
+
+      const db = await getDb();
+      const customCollection = db.collection("battle_notifications");
+      const now = new Date();
+      const payload = await getBattleNotificationPayload(now);
+      const scheduled = await customCollection
+        .find(
+          {
+            type: "custom",
+            status: "scheduled",
+            startsAt: { $gt: now },
+          },
+          { sort: { startsAt: 1 }, limit: 20 }
+        )
+        .project({
+          _id: 1,
+          message: 1,
+          level: 1,
+          status: 1,
+          startsAt: 1,
+          endsAt: 1,
+          createdAt: 1,
+          createdBy: 1,
+        })
+        .toArray();
+
+      return res.status(200).json({
+        ...payload,
+        scheduled: scheduled.map((item) => ({
+          id: `custom:${String(item._id)}`,
+          message: String(item.message || ""),
+          level: String(item.level || "info"),
+          status: String(item.status || "scheduled"),
+          startsAt: item.startsAt ? new Date(item.startsAt).toISOString() : null,
+          endsAt: item.endsAt ? new Date(item.endsAt).toISOString() : null,
+          createdAt: item.createdAt ? new Date(item.createdAt).toISOString() : null,
+          createdBy: String(item.createdBy || ""),
+        })),
+      });
+    }
+
+    // Short cache for consistency while keeping response near real-time.
+    res.setHeader("Cache-Control", "public, s-maxage=5, stale-while-revalidate=10");
+    return res.status(200).json(await getBattleNotificationPayload(new Date()));
+  }
+
+  if (!["POST", "DELETE"].includes(req.method)) {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const admin = verifyAdminRequest(req, res);
+  if (!admin) return;
+
+  if (req.method === "DELETE") {
+    const db = await getDb();
+    const customCollection = db.collection("battle_notifications");
+    const idRaw = String(req.body?.id || req.query?.id || "").trim();
+    const now = new Date();
+    const update = {
+      $set: {
+        status: "cancelled",
+        cancelledAt: now,
+        cancelledBy: admin.email || admin.id || "admin",
+      },
+    };
+
+    if (idRaw) {
+      const cleanId = idRaw.startsWith("custom:") ? idRaw.slice("custom:".length) : idRaw;
+      if (!ObjectId.isValid(cleanId)) {
+        return res.status(400).json({ error: "Invalid notification id" });
+      }
+
+      const result = await customCollection.updateOne(
+        { _id: new ObjectId(cleanId), type: "custom", status: { $in: ["active", "scheduled"] } },
+        update
+      );
+      if (!result.matchedCount) {
+        return res.status(404).json({ error: "Custom notification not found" });
+      }
+      return res.status(200).json({ success: true, cancelledCount: result.modifiedCount || 1 });
+    }
+
+    const result = await customCollection.updateMany(
+      { type: "custom", status: { $in: ["active", "scheduled"] } },
+      update
+    );
+    return res.status(200).json({ success: true, cancelledCount: result.modifiedCount || 0 });
+  }
+
+  const message = String(req.body?.message || "").trim();
+  const levelRaw = String(req.body?.level || "info").trim().toLowerCase();
+  const level = ["info", "success", "error"].includes(levelRaw) ? levelRaw : "info";
+  const hoursRaw = Number.parseInt(String(req.body?.durationHours || "0"), 10);
+  const minutesRaw = Number.parseInt(String(req.body?.durationMinutes || "0"), 10);
+  const secondsRaw = Number.parseInt(String(req.body?.durationSeconds || "0"), 10);
+  const fallbackMinutesRaw = Number.parseInt(String(req.body?.durationMinutesLegacy || "30"), 10);
+
+  const hours = Number.isFinite(hoursRaw) ? Math.max(0, Math.min(24, hoursRaw)) : 0;
+  const minutes = Number.isFinite(minutesRaw) ? Math.max(0, Math.min(59, minutesRaw)) : 0;
+  const seconds = Number.isFinite(secondsRaw) ? Math.max(0, Math.min(59, secondsRaw)) : 0;
+  let durationSeconds = (hours * 3600) + (minutes * 60) + seconds;
+  if (durationSeconds <= 0) {
+    const fallbackMinutes = Number.isFinite(fallbackMinutesRaw) ? Math.max(1, Math.min(1440, fallbackMinutesRaw)) : 30;
+    durationSeconds = fallbackMinutes * 60;
+  }
+  durationSeconds = Math.max(1, Math.min(86400, durationSeconds));
+
+  if (!message) {
+    return res.status(400).json({ error: "Message is required" });
+  }
+  if (message.length > 240) {
+    return res.status(400).json({ error: "Message must be 240 characters or fewer" });
+  }
+
+  const now = new Date();
+  const scheduleAtRaw = String(req.body?.scheduleAt || "").trim();
+  let startsAt = now;
+  if (scheduleAtRaw) {
+    const parsed = new Date(scheduleAtRaw);
+    if (Number.isNaN(parsed.getTime())) {
+      return res.status(400).json({ error: "Invalid schedule time" });
+    }
+    if (parsed.getTime() <= now.getTime()) {
+      return res.status(400).json({ error: "Schedule time must be in the future" });
+    }
+    startsAt = parsed;
+  }
+  const endsAt = new Date(startsAt.getTime() + durationSeconds * 1000);
+  const status = startsAt.getTime() > now.getTime() ? "scheduled" : "active";
+
+  const db = await getDb();
+  const customCollection = db.collection("battle_notifications");
+  const result = await customCollection.insertOne({
+    type: "custom",
+    status,
+    message,
+    level,
+    startsAt,
+    endsAt,
+    createdAt: now,
+    createdBy: admin.email || admin.id || "admin",
+  });
+
+  return res.status(200).json({
+    success: true,
+    mode: status,
+    notification: {
+      id: `custom:${String(result.insertedId)}`,
+      phase: "custom",
+      message,
+      level,
+      startsAt: startsAt.toISOString(),
+      endsAt: endsAt.toISOString(),
+      durationSeconds,
+    },
   });
 }
 
@@ -849,6 +1239,8 @@ export default async function handler(req, res) {
         return await handleResetPassword(req, res);
       case "profile-picture":
         return await handleProfilePicture(req, res);
+      case "profile-preferences":
+        return await handleProfilePreferences(req, res);
       case "lastfm-session":
         return await handleLastfmSession(req, res);
       case "lastfm-battle-stats":
@@ -859,6 +1251,10 @@ export default async function handler(req, res) {
         return await handleLastfmSyncNow(req, res);
       case "top-scrobblers":
         return await handleTopScrobblers(req, res);
+      case "public-top-scrobblers":
+        return await handlePublicTopScrobblers(req, res);
+      case "battle-notifications":
+        return await handleBattleNotifications(req, res);
       default:
         return res.status(404).json({ error: "Not found" });
     }
