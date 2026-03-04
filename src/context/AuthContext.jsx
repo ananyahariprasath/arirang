@@ -45,8 +45,13 @@ export function AuthProvider({ children }) {
   const closeAuthModal = () => setIsAuthModalOpen(false);
 
   const updateUser = (userData) => {
-    setUser(userData);
-    localStorage.setItem("auth_user", JSON.stringify(userData));
+    setUser((prev) => {
+      const next = typeof userData === "function"
+        ? userData(prev)
+        : { ...(prev || {}), ...(userData || {}) };
+      localStorage.setItem("auth_user", JSON.stringify(next));
+      return next;
+    });
   };
 
   return (

@@ -261,7 +261,10 @@ async function fetchLiveBattlesForSync(db) {
 
   const sourceUrl = process.env.DATA_SOURCE_URL || DEFAULT_DATA_SOURCE_URL;
   const response = await fetch(sourceUrl);
-  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(`Failed to fetch live battle source (${response.status})`);
+  }
+  const data = await response.json().catch(() => ({}));
   const liveBattles = Array.isArray(data?.liveBattles) ? data.liveBattles : [];
   return liveBattles.map(normalizeBattleConfig).filter(Boolean);
 }
@@ -444,8 +447,8 @@ async function processBattleBatch({ db, battle, apiKey, resetKey, toUts = null }
     region: { $in: regionNames },
   };
 
-  if (state?.cursorId) {
-    query._id = { $gt: new ObjectId(state.cursorId) };
+  if (state?.cursorId && ObjectId.isValid(String(state.cursorId))) {
+    query._id = { $gt: new ObjectId(String(state.cursorId)) };
   }
 
   const users = await usersCollection
@@ -604,9 +607,6 @@ async function processBattleBatch({ db, battle, apiKey, resetKey, toUts = null }
           },
           $setOnInsert: {
             createdAt: now,
-            albumStreams: 0,
-            titleStreams: 0,
-            totalStreams: 0,
           },
           $inc: {
             albumStreams: albumDelta,
@@ -629,15 +629,6 @@ async function processBattleBatch({ db, battle, apiKey, resetKey, toUts = null }
         battleId: battle.id,
         resetKey,
         configKey,
-        regionA: battle.regionA,
-        regionB: battle.regionB,
-        artist: battle.artist,
-        albumName: battle.albumName,
-        trackName: battle.trackName,
-        totals: {
-          sideA: { album: 0, title: 0, users: 0 },
-          sideB: { album: 0, title: 0, users: 0 },
-        },
         createdAt: new Date(),
       },
       $set: {
@@ -831,6 +822,9 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error("Last.fm cron sync error:", error);
-    return res.status(500).json({ error: "Internal server error" });
+    return res.status(500).json({
+      error: "Internal server error",
+      detail: error instanceof Error ? error.message : "Unknown error",
+    });
   }
 }

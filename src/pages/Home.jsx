@@ -226,7 +226,6 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
         setIsOnboardingOpen(shouldShow);
 
         updateUser({
-          ...user,
           onboardingComplete,
           onboardingSnoozeUntil: snoozeUntilRaw || null,
         });
@@ -265,35 +264,50 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get("token");
+    if (!token) return;
+    if (!user?.id) return;
 
-    if (token && user && !user.lastfmUsername) {
-      const linkLastFm = async () => {
-        try {
-          const res = await fetch("/api/auth/lastfm-session", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ token, userId: user.id })
-          });
-          
-          const data = await res.json();
-          if (res.ok) {
-            updateUser({ ...user, lastfmUsername: data.lastfmUsername });
-            toast.show(`Successfully linked Last.fm account: ${data.lastfmUsername}`, "success");
-          } else {
-            toast.show(data.error || "Failed to link Last.fm", "error");
-          }
-        } catch (err) {
-          console.error("Last.fm linking error:", err);
-          toast.show("An error occurred while linking Last.fm", "error");
-        } finally {
-          // Clean up URL
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
-      };
-
-      linkLastFm();
+    const callbackKey = `lastfm_callback_handled_${token}`;
+    const alreadyHandled = sessionStorage.getItem(callbackKey) === "1";
+    if (alreadyHandled) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
     }
-  }, [user, updateUser, toast]);
+
+    if (user.lastfmUsername) {
+      sessionStorage.setItem(callbackKey, "1");
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+
+    sessionStorage.setItem(callbackKey, "1");
+
+    const linkLastFm = async () => {
+      try {
+        const res = await fetch("/api/auth/lastfm-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token, userId: user.id })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          updateUser({ lastfmUsername: data.lastfmUsername });
+          toast.show(`Successfully linked Last.fm account: ${data.lastfmUsername}`, "success");
+        } else {
+          toast.show(data.error || "Failed to link Last.fm", "error");
+        }
+      } catch (err) {
+        console.error("Last.fm linking error:", err);
+        toast.show("An error occurred while linking Last.fm", "error");
+      } finally {
+        // Clean up URL after callback handling.
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    };
+
+    linkLastFm();
+  }, [user?.id, user?.lastfmUsername, updateUser, toast]);
 
   // Show daily update first (if present and unseen), then preserve winner modal behavior.
   useEffect(() => {
@@ -562,7 +576,6 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
                 });
                 if (response.ok) {
                   updateUser({
-                    ...user,
                     onboardingComplete: true,
                     onboardingSnoozeUntil: null,
                   });
@@ -598,7 +611,6 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
                 });
                 if (response.ok) {
                   updateUser({
-                    ...user,
                     onboardingComplete: false,
                     onboardingSnoozeUntil: next.toISOString(),
                   });
@@ -630,4 +642,3 @@ function Home({ onNavigateToProof, onOpenAdmin }) {
 }
 
 export default Home;
-

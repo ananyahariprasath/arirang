@@ -945,8 +945,9 @@ async function handleLastfmSyncNow(req, res) {
   });
   const syncData = await syncResponse.json().catch(() => ({}));
   if (!syncResponse.ok) {
+    const errorMessage = [syncData.error, syncData.detail].filter(Boolean).join(": ");
     return res.status(syncResponse.status).json({
-      error: syncData.error || "Failed to run Last.fm sync",
+      error: errorMessage || "Failed to run Last.fm sync",
       details: syncData,
     });
   }
