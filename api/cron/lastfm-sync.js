@@ -464,6 +464,7 @@ async function processBattleBatch({ db, battle, apiKey, resetKey, toUts = null }
     sideA: { album: 0, title: 0, users: 0 },
     sideB: { album: 0, title: 0, users: 0 },
   };
+  const nowUts = Math.floor(Date.now() / 1000);
   const resetStartUts = Math.floor(Date.parse(`${resetKey}T00:00:00.000Z`) / 1000);
   const artistTarget = normalizeTarget(battle.artist);
   const albumTarget = normalizeTarget(battle.albumName);
