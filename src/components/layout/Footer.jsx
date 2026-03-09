@@ -3,7 +3,7 @@ import { useTheme } from "../../context/ThemeContext";
 function Footer() {
   const { theme } = useTheme();
   return (
-    <footer className="fixed bottom-0 w-full z-40">
+    <footer className="relative md:fixed md:bottom-0 w-full z-40">
 
       {/* Animated Line */}
       <div className="relative h-[2px] w-full overflow-hidden bg-[var(--accent)]/20">

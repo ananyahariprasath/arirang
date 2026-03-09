@@ -140,6 +140,7 @@ function Header({ onToggleSection }) {
   const [availableTranslateLanguages, setAvailableTranslateLanguages] = useState([]);
   const [translateSearch, setTranslateSearch] = useState("");
   const [translateLoading, setTranslateLoading] = useState(true);
+  const [isMobileTranslateOpen, setIsMobileTranslateOpen] = useState(false);
   const [topicRoomsUnread, setTopicRoomsUnread] = useState(0);
 
   const profileRef = useRef(null);
@@ -303,6 +304,12 @@ function Header({ onToggleSection }) {
   useEffect(() => {
     if (!isTranslateOpen) setTranslateSearch("");
   }, [isTranslateOpen]);
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      setIsMobileTranslateOpen(false);
+    }
+  }, [isMenuOpen]);
 
   useEffect(() => {
     const identity = toIdentity(user?.username || user?.email || "");
@@ -663,8 +670,8 @@ function Header({ onToggleSection }) {
 
             {/* Mobile Menu Dropdown */}
             {isMenuOpen && (
-              <div className="absolute top-full right-0 w-64 bg-[var(--bg-primary)]/95 backdrop-blur-xl border border-[var(--accent)]/30 rounded-bl-3xl shadow-2xl animate-in fade-in slide-in-from-top-5 duration-200 z-50">
-                <div className="px-4 py-6 space-y-4 flex flex-col items-stretch">
+              <div className="absolute top-full right-0 w-64 max-h-[calc(100vh-72px)] overflow-y-auto overscroll-contain no-scrollbar bg-[var(--bg-primary)]/95 backdrop-blur-xl border border-[var(--accent)]/30 rounded-bl-3xl shadow-2xl animate-in fade-in slide-in-from-top-5 duration-200 z-50">
+                <div className="px-4 py-5 space-y-4 flex flex-col items-stretch">
                   
                   {/* Mobile Toggle Switch */}
                   <div className="flex items-center justify-between px-2">
@@ -684,40 +691,56 @@ function Header({ onToggleSection }) {
                   </div>
 
                   <div className="px-2">
-                    <label className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-1.5 block">Translate</label>
-                    <p className="text-[10px] leading-snug text-[var(--text-secondary)]/80 mb-2 text-center">
-                      If you see &quot;No language found&quot;, please refresh the page and you&apos;ll be able to see them.
-                    </p>
-                    <input
-                      type="text"
-                      value={translateSearch}
-                      onChange={(e) => setTranslateSearch(e.target.value)}
-                      placeholder="Search language..."
-                      className="w-full mb-2 bg-[var(--card-bg)]/60 border border-[var(--accent)]/30 rounded-lg px-3 py-2 text-[10px] font-semibold focus:outline-none focus:border-[var(--accent)]"
-                    />
-                    <div className="relative">
-                      <IconGlobe className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 opacity-60" />
-                      <select
-                        value={selectedTranslateLang}
-                        onChange={(e) => {
-                          setIsMenuOpen(false);
-                          translateTo(e.target.value);
-                        }}
-                        className="w-full pl-9 pr-3 py-2.5 text-[10px] font-black rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 transition-all uppercase tracking-widest appearance-none"
-                      >
-                        {translateLoading ? (
-                          <option value={selectedTranslateLang}>Loading languages...</option>
-                        ) : filteredTranslateLanguages.length === 0 ? (
-                          <option value={selectedTranslateLang}>No language found</option>
-                        ) : (
-                          filteredTranslateLanguages.map((lang) => (
-                            <option key={lang.code} value={lang.code}>
-                              {lang.label}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileTranslateOpen((prev) => !prev)}
+                      className="w-full px-3 py-2 text-[10px] font-black rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 transition-all tracking-widest uppercase flex items-center justify-between"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <IconGlobe className="w-3.5 h-3.5" />
+                        Translate
+                      </span>
+                      <svg viewBox="0 0 24 24" fill="none" className={`w-3.5 h-3.5 transition-transform ${isMobileTranslateOpen ? "rotate-180" : ""}`} aria-hidden="true">
+                        <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                    {isMobileTranslateOpen ? (
+                      <div className="mt-2">
+                        <p className="text-[10px] leading-snug text-[var(--text-secondary)]/80 mb-2 text-center">
+                          If you see &quot;No language found&quot;, please refresh the page and you&apos;ll be able to see them.
+                        </p>
+                        <input
+                          type="text"
+                          value={translateSearch}
+                          onChange={(e) => setTranslateSearch(e.target.value)}
+                          placeholder="Search language..."
+                          className="w-full mb-2 bg-[var(--card-bg)]/60 border border-[var(--accent)]/30 rounded-lg px-3 py-2 text-[10px] font-semibold focus:outline-none focus:border-[var(--accent)]"
+                        />
+                        <div className="relative">
+                          <IconGlobe className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 opacity-60" />
+                          <select
+                            value={selectedTranslateLang}
+                            onChange={(e) => {
+                              setIsMenuOpen(false);
+                              translateTo(e.target.value);
+                            }}
+                            className="w-full pl-9 pr-3 py-2.5 text-[10px] font-black rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 transition-all uppercase tracking-widest appearance-none"
+                          >
+                            {translateLoading ? (
+                              <option value={selectedTranslateLang}>Loading languages...</option>
+                            ) : filteredTranslateLanguages.length === 0 ? (
+                              <option value={selectedTranslateLang}>No language found</option>
+                            ) : (
+                              filteredTranslateLanguages.map((lang) => (
+                                <option key={lang.code} value={lang.code}>
+                                  {lang.label}
+                                </option>
+                              ))
+                            )}
+                          </select>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* Mobile Recent Battles Button */}
@@ -777,7 +800,7 @@ function Header({ onToggleSection }) {
                        hover:bg-[var(--accent)]/10
                        transition-all duration-300 tracking-widest uppercase flex items-center justify-center gap-2"
                     >
-                      <IconMessage /> Topic Rooms
+                      <IconMessage /> Chat Rooms
                       {topicRoomsUnread > 0 ? (
                         <span className="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black leading-none flex items-center justify-center border border-white/20">
                           {topicRoomsUnread > 99 ? "99+" : topicRoomsUnread}

@@ -586,9 +586,9 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
       : "w-full h-full bg-[var(--bg-primary)] border-0 rounded-none shadow-none overflow-hidden flex flex-col";
   const contentClass = mode === "modal" ? "p-4 sm:p-6 overflow-y-auto" : "p-3 sm:p-5 h-full min-h-0 overflow-y-auto no-scrollbar";
   const landingGridClass = isAdmin
-    ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 auto-rows-fr gap-3 items-stretch"
-    : "grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-5 xl:grid-rows-3 gap-3 items-stretch xl:min-h-[58vh]";
-  const landingCardClass = "h-full min-h-[130px] rounded-xl border p-3 flex flex-col";
+    ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 xl:auto-rows-fr gap-3 items-start"
+    : "grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-5 xl:grid-rows-3 gap-3 items-start xl:min-h-[58vh]";
+  const landingCardClass = "min-h-[86px] sm:min-h-[96px] xl:min-h-[130px] rounded-xl border p-2.5 sm:p-3 flex flex-col";
   const nonAdminCreatePlacement = !isAdmin ? "order-1 xl:col-start-2 xl:row-start-2" : "";
   const nonAdminJoinPlacement = !isAdmin ? "order-2 xl:col-start-3 xl:row-start-2" : "";
   const nonAdminActivePlacement = !isAdmin ? "order-3 xl:col-start-4 xl:row-start-2" : "";
@@ -882,13 +882,17 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
               </div>
             ) : selectedRoom ? (
               <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center justify-between gap-2">
                   <button
                     type="button"
                     onClick={() => setView("landing")}
-                    className="px-3 py-1.5 rounded-lg border border-[var(--accent)]/30 text-[var(--accent)] text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent)]/10 transition-all"
+                    aria-label="Back to rooms"
+                    title="Back to rooms"
+                    className="inline-flex items-center justify-center w-9 h-9 rounded-full border border-[var(--accent)]/30 text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all"
                   >
-                    Back to Rooms
+                    <svg viewBox="0 0 24 24" fill="none" className="w-4.5 h-4.5" aria-hidden="true">
+                      <path d="M15 6L9 12L15 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
                   </button>
                   <div className="flex items-center gap-2">
                     <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${selectedRoom.status === "active" ? "border-amber-300/40 text-amber-200 bg-amber-500/10" : "border-red-300/40 text-red-200 bg-red-500/10"}`}>
@@ -952,14 +956,24 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
                           <div key={message.id} className={`flex ${toIdentity(message.authorIdentity) === currentUserRoomIdentity ? "justify-end" : "justify-start"}`}>
                             <div className={`max-w-[94%] sm:max-w-[86%] rounded-2xl border p-3 ${toIdentity(message.authorIdentity) === currentUserRoomIdentity ? "border-[var(--accent)]/35 bg-[var(--accent)]/10" : "border-[var(--accent)]/15 bg-[var(--bg-primary)]/40"}`}>
                               <div className="flex flex-wrap items-center justify-between gap-2">
-                                <p className="text-[10px] uppercase tracking-widest font-black text-[var(--accent)]">
-                                  <UserNameWithBadge label={message.author} isAdmin={String(message.authorRole || "").toLowerCase() === "admin"} />
-                                </p>
                                 <div className="flex items-center gap-2">
-                                  <p className="text-[10px] font-bold text-[var(--text-secondary)]">{message.createdAt}</p>
-                                  <button type="button" onClick={() => handleReplyMessage(message)} className="px-2 py-1 rounded-full border border-[var(--accent)]/35 text-[var(--accent)] text-[9px] font-black uppercase tracking-widest hover:bg-[var(--accent)]/10 transition-all">
-                                    Reply
+                                  <p className="text-[10px] uppercase tracking-widest font-black text-[var(--accent)]">
+                                    <UserNameWithBadge label={message.author} isAdmin={String(message.authorRole || "").toLowerCase() === "admin"} />
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReplyMessage(message)}
+                                    title="Reply"
+                                    aria-label="Reply"
+                                    className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-[var(--accent)]/35 text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all"
+                                  >
+                                    <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5" aria-hidden="true">
+                                      <path d="M10 8L6 12L10 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                      <path d="M6 12H14C17.3 12 20 14.7 20 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                    </svg>
                                   </button>
+                                </div>
+                                <div className="flex items-center gap-2">
                                   {toIdentity(message.authorIdentity) !== currentUserRoomIdentity ? (
                                     <button type="button" onClick={() => void handleReportUser(selectedRoom, message)} disabled={reportingMessageId === String(message.id)} className="px-2.5 py-1 rounded-full border border-red-400/40 text-red-300 text-[9px] font-black uppercase tracking-widest hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                                       {reportingMessageId === String(message.id) ? "Reporting..." : "Report User"}
@@ -1011,35 +1025,49 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
                       </div>
                     ) : null}
 
-                    <div className="w-full flex flex-col lg:flex-row gap-2">
-                      <input
-                        type="text"
-                        value={messageDraft}
-                        onChange={(e) => setMessageDraft(e.target.value)}
-                        disabled={selectedRoom.status !== "active"}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleSendMessage();
-                          }
-                        }}
-                        placeholder={selectedRoom.status === "active" ? "Write a message..." : "Room is closed or expired."}
-                        className="flex-1 bg-[var(--bg-primary)] border border-[var(--accent)]/20 rounded-xl px-3 py-2.5 text-sm font-semibold outline-none focus:border-[var(--accent)] disabled:opacity-55 disabled:cursor-not-allowed"
-                      />
-                      <label
-                        title="Add image"
-                        className={`inline-flex items-center justify-center w-11 h-11 rounded-xl border border-[var(--accent)]/30 text-[var(--accent)] bg-[var(--accent)]/5 hover:bg-[var(--accent)]/15 transition-all text-center cursor-pointer ${selectedRoom.status !== "active" ? "opacity-50 pointer-events-none" : ""}`}
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" aria-hidden="true">
-                          <path d="M4 7C4 5.9 4.9 5 6 5H18C19.1 5 20 5.9 20 7V17C20 18.1 19.1 19 18 19H6C4.9 19 4 18.1 4 17V7Z" stroke="currentColor" strokeWidth="2" />
-                          <circle cx="9" cy="10" r="1.5" fill="currentColor" />
-                          <path d="M6 16L11 12L14 14L18 11L20 13V17C20 18.1 19.1 19 18 19H6C4.9 19 4 18.1 4 17V16H6Z" fill="currentColor" fillOpacity="0.25" />
-                        </svg>
-                        <input type="file" accept="image/*" className="hidden" disabled={selectedRoom.status !== "active"} onChange={handleSelectMessageImage} />
-                      </label>
-                      <button type="button" onClick={handleSendMessage} disabled={selectedRoom.status !== "active" || (!String(messageDraft || "").trim() && !messageImageData)} className="px-4 py-2.5 rounded-xl border border-[var(--accent)]/40 bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent)]/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                        Post
-                      </button>
+                    <div className="w-full">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={messageDraft}
+                          onChange={(e) => setMessageDraft(e.target.value)}
+                          disabled={selectedRoom.status !== "active"}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleSendMessage();
+                            }
+                          }}
+                          placeholder={selectedRoom.status === "active" ? "Write a message..." : "Room is closed or expired."}
+                          className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 rounded-xl pl-3 pr-[116px] sm:pr-[126px] py-2.5 text-sm font-semibold outline-none focus:border-[var(--accent)] disabled:opacity-55 disabled:cursor-not-allowed"
+                        />
+                        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                          <label
+                            title="Add image"
+                            className={`inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[var(--accent)]/30 text-[var(--accent)] bg-[var(--accent)]/5 hover:bg-[var(--accent)]/15 transition-all text-center cursor-pointer ${selectedRoom.status !== "active" ? "opacity-50 pointer-events-none" : ""}`}
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" className="w-4.5 h-4.5" aria-hidden="true">
+                              <path d="M4 7C4 5.9 4.9 5 6 5H18C19.1 5 20 5.9 20 7V17C20 18.1 19.1 19 18 19H6C4.9 19 4 18.1 4 17V7Z" stroke="currentColor" strokeWidth="2" />
+                              <circle cx="9" cy="10" r="1.5" fill="currentColor" />
+                              <path d="M6 16L11 12L14 14L18 11L20 13V17C20 18.1 19.1 19 18 19H6C4.9 19 4 18.1 4 17V16H6Z" fill="currentColor" fillOpacity="0.25" />
+                            </svg>
+                            <input type="file" accept="image/*" className="hidden" disabled={selectedRoom.status !== "active"} onChange={handleSelectMessageImage} />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={handleSendMessage}
+                            title="Send"
+                            aria-label="Send message"
+                            disabled={selectedRoom.status !== "active" || (!String(messageDraft || "").trim() && !messageImageData)}
+                            className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-[var(--accent)]/40 bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" className="w-4.5 h-4.5" aria-hidden="true">
+                              <path d="M3 11.5L20 4L13.5 21L11.2 13.8L3 11.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                              <path d="M11.2 13.8L20 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </section>
                 </div>
