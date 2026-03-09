@@ -52,7 +52,7 @@ function resolveCountryFromUser(user) {
   return caseInsensitive || null;
 }
 
-function Home({ onNavigateToProof, onOpenAdmin, onOpenSettings }) {
+function Home({ onNavigateToProof, onOpenAdmin, onOpenSettings, onOpenTopicRooms }) {
   const [selectedCountry, setSelectedCountry] = useState(COUNTRY_PLACEHOLDER);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRecentBattlesOpen, setIsRecentBattlesOpen] = useState(false);
@@ -365,6 +365,12 @@ function Home({ onNavigateToProof, onOpenAdmin, onOpenSettings }) {
       setIsTopAchieversOpen(!isTopAchieversOpen);
       setIsRecentBattlesOpen(false);
       setIsContactOpen(false);
+      setIsTopicRoomsOpen(false);
+    } else if (section === "topic-rooms") {
+      setIsRecentBattlesOpen(false);
+      setIsContactOpen(false);
+      setIsTopAchieversOpen(false);
+      onOpenTopicRooms?.();
     } else if (section === "share-milestone") {
       setIsMilestoneModalOpen(true);
     } else if (section === 'admin') {

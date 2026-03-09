@@ -1377,13 +1377,24 @@ async function handleUsersSummary(req, res) {
 
   const users = await usersCollection
     .find({})
-    .project({ _id: 0, role: 1, lastfmUsername: 1 })
+    .project({ _id: 0, role: 1, username: 1, email: 1, lastfmUsername: 1 })
     .toArray();
 
   const regularUsers = users.filter((u) => (u.role || "user") !== "admin");
-  const connectedCount = regularUsers.filter((u) => String(u.lastfmUsername || "").trim().length > 0).length;
+  const getDisplayName = (user) => String(user?.username || user?.email || "").trim();
+  const connectedUsers = regularUsers.filter((u) => String(u.lastfmUsername || "").trim().length > 0);
+  const notConnectedUsers = regularUsers.filter((u) => String(u.lastfmUsername || "").trim().length === 0);
+  const connectedCount = connectedUsers.length;
   const totalUsers = regularUsers.length;
   const notConnectedCount = Math.max(0, totalUsers - connectedCount);
+  const connectedUsernames = connectedUsers
+    .map(getDisplayName)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  const notConnectedUsernames = notConnectedUsers
+    .map(getDisplayName)
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 
   return res.status(200).json({
     success: true,
@@ -1391,6 +1402,10 @@ async function handleUsersSummary(req, res) {
       signups: totalUsers,
       lastfmConnected: connectedCount,
       lastfmNotConnected: notConnectedCount,
+    },
+    usernames: {
+      lastfmConnected: connectedUsernames,
+      lastfmNotConnected: notConnectedUsernames,
     },
     generatedAt: new Date().toISOString(),
   });

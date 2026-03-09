@@ -5,6 +5,12 @@ import HelpDeskModal from "../modals/HelpDeskModal";
 import ConfirmModal from "../modals/ConfirmModal";
 import HeaderLogo from "../branding/HeaderLogo";
 
+const TOPIC_ROOMS_UNREAD_KEY_PREFIX = "topic_rooms_unread_total_v1_";
+
+function toIdentity(value) {
+  return String(value || "").trim().replace(/^@+/, "").toLowerCase();
+}
+
 
 function IconCamera({ className = "w-4 h-4" }) {
   return (
@@ -72,6 +78,14 @@ function IconGlobe({ className = "w-4 h-4" }) {
   );
 }
 
+function IconMessage({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+    </svg>
+  );
+}
+
 function IconLogout({ className = "w-4 h-4" }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
@@ -126,6 +140,7 @@ function Header({ onToggleSection }) {
   const [availableTranslateLanguages, setAvailableTranslateLanguages] = useState([]);
   const [translateSearch, setTranslateSearch] = useState("");
   const [translateLoading, setTranslateLoading] = useState(true);
+  const [topicRoomsUnread, setTopicRoomsUnread] = useState(0);
 
   const profileRef = useRef(null);
   const mobileMenuRef = useRef(null);
@@ -289,6 +304,30 @@ function Header({ onToggleSection }) {
     if (!isTranslateOpen) setTranslateSearch("");
   }, [isTranslateOpen]);
 
+  useEffect(() => {
+    const identity = toIdentity(user?.username || user?.email || "");
+    if (!identity) {
+      setTopicRoomsUnread(0);
+      return;
+    }
+    const key = `${TOPIC_ROOMS_UNREAD_KEY_PREFIX}${identity}`;
+    const syncUnread = () => {
+      const raw = localStorage.getItem(key);
+      const count = Number.parseInt(String(raw || "0"), 10);
+      setTopicRoomsUnread(Number.isFinite(count) ? Math.max(0, count) : 0);
+    };
+    syncUnread();
+    const onStorage = (e) => {
+      if (!e.key || e.key === key) syncUnread();
+    };
+    window.addEventListener("storage", onStorage);
+    const intervalId = setInterval(syncUnread, 1500);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      clearInterval(intervalId);
+    };
+  }, [user?.username, user?.email]);
+
   const filteredTranslateLanguages = availableTranslateLanguages.filter((lang) =>
     lang.label.toLowerCase().includes(translateSearch.trim().toLowerCase())
   );
@@ -380,7 +419,7 @@ function Header({ onToggleSection }) {
   return (
     <>
       <header className="sticky top-0 z-50 backdrop-blur-md bg-[var(--bg-primary)]/80 border-b border-[var(--accent)] transition-all duration-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 md:py-2.5 relative flex items-center justify-between">
+        <div className="w-full px-2 sm:px-4 lg:px-6 py-2 md:py-2.5 relative flex items-center justify-between">
 
           {/* Left: Logo */}
           <div className="flex-shrink-0 h-10 md:h-12 flex items-center">
@@ -395,24 +434,82 @@ function Header({ onToggleSection }) {
           </div>
 
           {/* Right Section - Desktop */}
-          <div className="hidden md:flex items-center gap-3 lg:gap-4 xl:gap-6">
-            {/* Help Desk Button */}
-            <button
-              onClick={() => setIsHelpOpen(true)}
-              className="px-4 lg:px-5 xl:px-6 py-2 lg:py-2.5 text-xs lg:text-sm font-bold rounded-2xl
-               bg-[var(--card-bg)]/40 backdrop-blur-xl
-               border border-[var(--accent)]/40
-               hover:bg-[var(--accent)]/10
-               transition-all duration-300 whitespace-nowrap uppercase tracking-widest"
-            >
-              Help Desk
-            </button>
+          <div className="hidden md:flex items-center justify-end ml-auto gap-2 lg:gap-3">
+            {onToggleSection && (
+              <button
+                onClick={() => {
+                  onToggleSection("topic-rooms");
+                }}
+                className="relative w-9 h-9 rounded-full bg-[var(--card-bg)]/50 backdrop-blur-xl border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:border-[var(--accent)] transition-all duration-300 flex items-center justify-center"
+                aria-label="Topic Rooms"
+                title="Topic Rooms"
+              >
+                <IconMessage className="w-4 h-4" />
+                {topicRoomsUnread > 0 ? (
+                  <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black leading-none flex items-center justify-center border border-white/20">
+                    {topicRoomsUnread > 99 ? "99+" : topicRoomsUnread}
+                  </span>
+                ) : null}
+              </button>
+            )}
+
+            <div id="onboarding-header-translate" className="relative" ref={translateRef}>
+              <button
+                onClick={() => {
+                  setIsTranslateOpen((prev) => !prev);
+                  setTranslateSearch("");
+                }}
+                className="w-9 h-9 rounded-full bg-[var(--card-bg)]/50 backdrop-blur-xl border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:border-[var(--accent)] transition-all duration-300 flex items-center justify-center"
+                aria-label="Translate"
+                title="Translate"
+                aria-expanded={isTranslateOpen}
+                aria-haspopup="menu"
+              >
+                <IconGlobe className="w-4 h-4" />
+              </button>
+
+              {isTranslateOpen && (
+                <div className="absolute right-0 mt-2 w-56 max-h-72 overflow-y-auto no-scrollbar bg-[var(--card-bg)] border border-[var(--accent)]/30 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                  <p className="px-3 pb-2 text-[10px] leading-snug text-[var(--text-secondary)]/80 text-center">
+                    If you see &quot;No language found&quot;, please refresh the page and you&apos;ll be able to see them.
+                  </p>
+                  <div className="px-3 pb-2 border-b border-[var(--accent)]/20">
+                    <input
+                      type="text"
+                      value={translateSearch}
+                      onChange={(e) => setTranslateSearch(e.target.value)}
+                      placeholder="Search language..."
+                      className="w-full bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-all"
+                    />
+                  </div>
+                  {translateLoading ? (
+                    <div className="px-4 py-3 text-xs text-[var(--text-secondary)]/70">Loading languages...</div>
+                  ) : filteredTranslateLanguages.length === 0 ? (
+                    <div className="px-4 py-3 text-xs text-[var(--text-secondary)]/70">No language found</div>
+                  ) : filteredTranslateLanguages.map((lang) => {
+                    const active = selectedTranslateLang === lang.code;
+                    return (
+                      <button
+                        key={lang.code}
+                        onClick={() => translateTo(lang.code)}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${
+                          active ? "bg-[var(--accent)]/10 text-[var(--accent)] font-bold" : "hover:bg-[var(--accent)]/10"
+                        }`}
+                      >
+                        <span>{lang.label}</span>
+                        {active ? <span className="text-[10px] uppercase tracking-widest">Selected</span> : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
 
             {user && (
               <div className="relative" ref={profileRef}>
                 <button
                   onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
-                  className="w-10 h-10 rounded-full bg-[var(--accent)] text-white flex items-center justify-center font-bold overflow-hidden border-2 border-[var(--accent)]/50 hover:border-[var(--accent)] transition-colors focus:outline-none"
+                  className="w-9 h-9 rounded-full bg-[var(--accent)] text-white flex items-center justify-center text-sm font-bold overflow-hidden border-2 border-[var(--accent)]/50 hover:border-[var(--accent)] transition-colors focus:outline-none"
                 >
                   {user.profilePicture ? (
                     <img src={user.profilePicture} alt="Profile" className="w-full h-full object-cover" />
@@ -533,57 +630,17 @@ function Header({ onToggleSection }) {
               </div>
             )}
 
-            <div id="onboarding-header-translate" className="relative" ref={translateRef}>
-              <button
-                onClick={() => {
-                  setIsTranslateOpen((prev) => !prev);
-                  setTranslateSearch("");
-                }}
-                className="w-10 h-10 rounded-full bg-[var(--card-bg)]/50 backdrop-blur-xl border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:border-[var(--accent)] transition-all duration-300 flex items-center justify-center"
-                aria-label="Translate"
-                title="Translate"
-                aria-expanded={isTranslateOpen}
-                aria-haspopup="menu"
-              >
-                <IconGlobe className="w-5 h-5" />
-              </button>
-
-              {isTranslateOpen && (
-                <div className="absolute right-0 mt-2 w-56 max-h-72 overflow-y-auto no-scrollbar bg-[var(--card-bg)] border border-[var(--accent)]/30 rounded-xl shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2">
-                  <p className="px-3 pb-2 text-[10px] leading-snug text-[var(--text-secondary)]/80 text-center">
-                    If you see &quot;No language found&quot;, please refresh the page and you&apos;ll be able to see them.
-                  </p>
-                  <div className="px-3 pb-2 border-b border-[var(--accent)]/20">
-                    <input
-                      type="text"
-                      value={translateSearch}
-                      onChange={(e) => setTranslateSearch(e.target.value)}
-                      placeholder="Search language..."
-                      className="w-full bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 rounded-lg px-2.5 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] transition-all"
-                    />
-                  </div>
-                  {translateLoading ? (
-                    <div className="px-4 py-3 text-xs text-[var(--text-secondary)]/70">Loading languages...</div>
-                  ) : filteredTranslateLanguages.length === 0 ? (
-                    <div className="px-4 py-3 text-xs text-[var(--text-secondary)]/70">No language found</div>
-                  ) : filteredTranslateLanguages.map((lang) => {
-                    const active = selectedTranslateLang === lang.code;
-                    return (
-                      <button
-                        key={lang.code}
-                        onClick={() => translateTo(lang.code)}
-                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${
-                          active ? "bg-[var(--accent)]/10 text-[var(--accent)] font-bold" : "hover:bg-[var(--accent)]/10"
-                        }`}
-                      >
-                        <span>{lang.label}</span>
-                        {active ? <span className="text-[10px] uppercase tracking-widest">Selected</span> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            {/* Help Desk Button */}
+            <button
+              onClick={() => setIsHelpOpen(true)}
+              className="px-3 lg:px-4 py-1.5 lg:py-2 text-[10px] lg:text-xs font-bold rounded-xl
+               bg-[var(--card-bg)]/40 backdrop-blur-xl
+               border border-[var(--accent)]/40
+               hover:bg-[var(--accent)]/10
+               transition-all duration-300 whitespace-nowrap uppercase tracking-widest"
+            >
+              Help
+            </button>
 
           </div>
 
@@ -707,6 +764,27 @@ function Header({ onToggleSection }) {
                   >
                     Support
                   </button>
+
+                  {onToggleSection && (
+                    <button
+                      onClick={() => {
+                        onToggleSection("topic-rooms");
+                        setIsMenuOpen(false);
+                      }}
+                      className="w-full px-5 py-3 text-[10px] font-black rounded-xl
+                       bg-[var(--card-bg)]/60 
+                       border border-[var(--accent)]/40
+                       hover:bg-[var(--accent)]/10
+                       transition-all duration-300 tracking-widest uppercase flex items-center justify-center gap-2"
+                    >
+                      <IconMessage /> Topic Rooms
+                      {topicRoomsUnread > 0 ? (
+                        <span className="min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black leading-none flex items-center justify-center border border-white/20">
+                          {topicRoomsUnread > 99 ? "99+" : topicRoomsUnread}
+                        </span>
+                      ) : null}
+                    </button>
+                  )}
 
                   {/* Mobile Profile Actions (if logged in) */}
                   {user && (

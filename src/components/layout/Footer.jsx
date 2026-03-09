@@ -26,7 +26,7 @@ function Footer() {
                     }`}
       >
         <p className="opacity-70 uppercase tracking-[0.2em] font-bold text-[10px] sm:text-xs">
-          © 2026 ARIRANG SPOTIFY TAKEOVER. All rights reserved.
+          © 2026 ARMYRANG. All rights reserved.
         </p>
         <p className="mt-1 text-[9px] sm:text-xs opacity-50">
           Designed with 💜 for the BTS ARMY by ARMY. This is a fan project and is not a part of HYBE or BTS.

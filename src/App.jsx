@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Home from "./pages/Home";
 import AdminPanel from "./pages/AdminPanel";
+import TopicRoomsPage from "./pages/TopicRoomsPage";
 import Footer from "./components/layout/Footer";
 import AuthPage from "./pages/AuthPage";
 import AccountSettings from "./pages/AccountSettings";
@@ -12,6 +13,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 function MainApp() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isTopicRoomsOpen, setIsTopicRoomsOpen] = useState(false);
   const [proofCountry, setProofCountry] = useState(null); // non-null = show SubmitProofPage
   
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -46,6 +48,12 @@ function MainApp() {
           country={proofCountry}
           onBack={handleBackFromProof}
         />
+      ) : isTopicRoomsOpen ? (
+        <TopicRoomsPage
+          onBack={() => setIsTopicRoomsOpen(false)}
+          onOpenAdmin={() => setIsAdminOpen(true)}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+        />
       ) : isSettingsOpen ? (
         <AccountSettings
           onBack={() => setIsSettingsOpen(false)}
@@ -57,6 +65,7 @@ function MainApp() {
             onNavigateToProof={handleNavigateToProof} 
             onOpenAdmin={() => setIsAdminOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenTopicRooms={() => setIsTopicRoomsOpen(true)}
           />
           <Footer />
         </>

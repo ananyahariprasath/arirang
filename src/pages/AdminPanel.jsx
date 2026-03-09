@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Header from "../components/layout/Header";
 import useBattles from "../hooks/useBattles";
 import useTimeline from "../hooks/useTimeline";
@@ -11,6 +11,24 @@ import { useAuth } from "../context/AuthContext";
 import { COUNTRY_PRESETS, COUNTRY_REGION_MAP, COUNTRIES, COUNTRY_TZ_MAP, FOCUS_PLAYLISTS } from "../constants";
 
 const allRegions = [...new Set(Object.values(COUNTRY_REGION_MAP))];
+const TOPIC_ROOM_TEMPLATE_RULES = [
+  "Be respectful. No harassment, hate speech, or personal attacks.",
+  "Stay on topic. Off-topic promotion or spam will be removed.",
+  "No private information (yours or others).",
+  "Admins can edit, close, or delete rooms if needed.",
+  "A maximum of 10 active rooms can exist at one time.",
+];
+const TOPIC_ROOM_TEMPLATE = {
+  title: "Comeback Strategy Room",
+  coverImage: "/assets/images/bts-un-photo-1.jpg",
+  createdBy: "@demo_army",
+  participants: 18,
+  roomLimit: 50,
+  activeRoomsUsed: 8,
+  activeRoomsLimit: 10,
+  expiresIn: "2h 15m",
+  category: "Streaming",
+};
 
 function AdminViewPanel() {
   const [submissions, setSubmissions] = useState([]);
@@ -285,7 +303,13 @@ function AdminPanel() {
   const [tickets, setTickets] = useState([]);
   const [ticketsLoading, setTicketsLoading] = useState(true);
   const [ticketsError, setTicketsError] = useState("");
-  const [userSummary, setUserSummary] = useState({ signups: 0, lastfmConnected: 0, lastfmNotConnected: 0 });
+  const [userSummary, setUserSummary] = useState({
+    signups: 0,
+    lastfmConnected: 0,
+    lastfmNotConnected: 0,
+    connectedUsernames: [],
+    notConnectedUsernames: [],
+  });
   const [userSummaryLoading, setUserSummaryLoading] = useState(true);
   const [userSummaryError, setUserSummaryError] = useState("");
   const [syncNowLoading, setSyncNowLoading] = useState(false);
@@ -298,6 +322,13 @@ function AdminPanel() {
   const [healthError, setHealthError] = useState("");
   const [healthChecks, setHealthChecks] = useState(null);
   const [healthGeneratedAt, setHealthGeneratedAt] = useState("");
+  const [topicRoomDraft, setTopicRoomDraft] = useState("");
+  const [topicRoomMessages, setTopicRoomMessages] = useState([]);
+  const [topicRoomImageData, setTopicRoomImageData] = useState("");
+  const [topicRoomImageName, setTopicRoomImageName] = useState("");
+  const [topicRoomCloseConfirmUntil, setTopicRoomCloseConfirmUntil] = useState(0);
+  const [reportingAuthorId, setReportingAuthorId] = useState("");
+  const [topicRoomPreviewImage, setTopicRoomPreviewImage] = useState(null);
   const [customNotifDraft, setCustomNotifDraft] = useState({
     message: "",
     level: "info",
@@ -319,7 +350,7 @@ function AdminPanel() {
   const { galleryImages, loading: galleryLoading, resetGallery, addGalleryImage, deleteGalleryImage, updateGalleryImage } = useGalleryData();
   const { updates, latestUpdate, addUpdate, deleteUpdate, clearUpdates, loading: updatesLoading } = useDailyUpdates();
   const toast = useToast();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const lastBattleNotificationIdRef = useRef("");
 
   const isDataLoading = regionsLoading || modsLoading || battlesLoading || timelineLoading || galleryLoading || updatesLoading;
@@ -366,6 +397,8 @@ function AdminPanel() {
   const [newGalleryImage, setNewGalleryImage] = useState({ src: "", type: "square" });
   const [editingGallerySrc, setEditingGallerySrc] = useState(null);
   const [editingGalleryType, setEditingGalleryType] = useState("");
+  const [topicRoomStatus, setTopicRoomStatus] = useState("active");
+  const [topicRoomClosedMeta, setTopicRoomClosedMeta] = useState(null);
   const [editingBattleId, setEditingBattleId] = useState(null);
   const [editingBattle, setEditingBattle] = useState(null);
   const [editingEventId, setEditingEventId] = useState(null);
@@ -509,7 +542,7 @@ function AdminPanel() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== "tickets") return;
+    if (!["tickets", "users"].includes(activeTab)) return;
 
     let active = true;
 
@@ -526,7 +559,13 @@ function AdminPanel() {
         }
 
         if (active) {
-          setUserSummary(data.counts || { signups: 0, lastfmConnected: 0, lastfmNotConnected: 0 });
+          setUserSummary({
+            signups: Number(data?.counts?.signups || 0),
+            lastfmConnected: Number(data?.counts?.lastfmConnected || 0),
+            lastfmNotConnected: Number(data?.counts?.lastfmNotConnected || 0),
+            connectedUsernames: Array.isArray(data?.usernames?.lastfmConnected) ? data.usernames.lastfmConnected : [],
+            notConnectedUsernames: Array.isArray(data?.usernames?.lastfmNotConnected) ? data.usernames.lastfmNotConnected : [],
+          });
         }
       } catch (error) {
         if (active) setUserSummaryError(error.message || "Failed to load user summary");
@@ -736,6 +775,127 @@ function AdminPanel() {
       setSyncNowLoading(false);
     }
   };
+
+  const handleSendTopicRoomMessage = () => {
+    if (topicRoomStatus === "closed") return;
+    const text = String(topicRoomDraft || "").trim();
+    if (!text && !topicRoomImageData) return;
+    setTopicRoomMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        author: String(user?.username || "you"),
+        text,
+        image: topicRoomImageData || "",
+        imageName: topicRoomImageName || "",
+        createdAt: new Date().toLocaleTimeString(),
+      },
+    ]);
+    setTopicRoomDraft("");
+    setTopicRoomImageData("");
+    setTopicRoomImageName("");
+  };
+
+  const normalizeIdentity = useCallback((value) => String(value || "").trim().replace(/^@+/, "").toLowerCase(), []);
+  const currentIdentity = normalizeIdentity(user?.username || user?.email || "");
+  const creatorIdentity = normalizeIdentity(TOPIC_ROOM_TEMPLATE.createdBy);
+  const canCloseTopicRoom = String(user?.role || "").toLowerCase() === "admin" || (currentIdentity && currentIdentity === creatorIdentity);
+
+  const handleCloseTopicRoom = () => {
+    if (!canCloseTopicRoom) {
+      toast.show("Only the room creator or an admin can close this room.", "error");
+      return;
+    }
+    if (topicRoomStatus === "closed") return;
+    const now = Date.now();
+    if (topicRoomCloseConfirmUntil < now) {
+      setTopicRoomCloseConfirmUntil(now + 4500);
+      toast.show("Tap 'Close Room' again within 4 seconds to confirm.", "info");
+      return;
+    }
+    const closedBy = String(user?.username || user?.email || "admin").trim() || "admin";
+    setTopicRoomStatus("closed");
+    setTopicRoomClosedMeta({
+      by: closedBy,
+      at: new Date().toLocaleString(),
+    });
+    setTopicRoomCloseConfirmUntil(0);
+    toast.show("Room closed", "success");
+  };
+
+  const handleSelectTopicRoomImage = (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file) return;
+    if (!String(file.type || "").startsWith("image/")) {
+      toast.show("Please select an image file.", "error");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.show("Image must be 2MB or smaller.", "error");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setTopicRoomImageData(String(reader.result || ""));
+      setTopicRoomImageName(file.name || "image");
+      toast.show("Image attached.", "success");
+    };
+    reader.onerror = () => {
+      toast.show("Failed to read image file.", "error");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleReportTopicRoomUser = async (message) => {
+    const author = String(message?.author || "").trim();
+    if (!author) return;
+    const authorId = String(message?.id || author);
+    setReportingAuthorId(authorId);
+    try {
+      const reporter = String(user?.username || user?.email || "anonymous").trim();
+      const payload = {
+        socialMedia: "topic-room-report",
+        userId: reporter,
+        query: `Urgent report: user "${author}" was reported from "${TOPIC_ROOM_TEMPLATE.title}". Message: "${String(message?.text || "").trim() || "[image-only post]"}".`,
+      };
+      const response = await fetch("/api/support-tickets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to notify admins");
+      }
+      toast.show("Report sent. Admins have been notified.", "success");
+    } catch (error) {
+      toast.show(error.message || "Failed to report user", "error");
+    } finally {
+      setReportingAuthorId("");
+    }
+  };
+
+  const connectedUsernames = useMemo(
+    () => (Array.isArray(userSummary.connectedUsernames) ? userSummary.connectedUsernames : []),
+    [userSummary.connectedUsernames]
+  );
+  const notConnectedUsernames = useMemo(
+    () => (Array.isArray(userSummary.notConnectedUsernames) ? userSummary.notConnectedUsernames : []),
+    [userSummary.notConnectedUsernames]
+  );
+  const normalizeUserId = useCallback((value) => String(value || "").trim().replace(/^@+/, "").toLowerCase(), []);
+  const knownLastfmUsers = useMemo(
+    () => new Set([...connectedUsernames, ...notConnectedUsernames].map(normalizeUserId).filter(Boolean)),
+    [connectedUsernames, notConnectedUsernames, normalizeUserId]
+  );
+  const filteredTickets = useMemo(
+    () =>
+      tickets.filter((ticket) => {
+        const ticketUser = normalizeUserId(ticket?.userId);
+        return !ticketUser || !knownLastfmUsers.has(ticketUser);
+      }),
+    [tickets, knownLastfmUsers, normalizeUserId]
+  );
 
   const handleDeleteTopScrobbler = async (row) => {
     const userId = String(row?.userId || "").trim();
@@ -1034,7 +1194,15 @@ function AdminPanel() {
                 <line x1="3" y1="18" x2="21" y2="18"></line>
               </svg>
               <span className="text-xs uppercase tracking-widest hidden md:inline">
-                {activeTab.replace("timeline", "Timeline").replace("regions", "Regions").replace("mods", "Mods").replace("updates", "Daily Updates").replace("global", "Global Config").replace("battles", "Battles").replace("tickets", "Support Tickets")}
+                {activeTab
+                  .replace("timeline", "Timeline")
+                  .replace("regions", "Regions")
+                  .replace("mods", "Mods")
+                  .replace("updates", "Daily Updates")
+                  .replace("global", "Global Config")
+                  .replace("battles", "Battles")
+                  .replace("users", "User Panel")
+                  .replace("tickets", "Support Tickets")}
               </span>
             </button>
 
@@ -1044,6 +1212,7 @@ function AdminPanel() {
                 <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
                 
                 <div className="absolute top-full right-0 md:left-0 md:right-auto mt-3 w-56 bg-[var(--bg-primary)]/90 backdrop-blur-3xl border border-[var(--accent)]/40 p-2 rounded-2xl shadow-2xl z-50 flex flex-col gap-1 animate-in slide-in-from-top-2 fade-in duration-200">
+                  <MenuButton tab="users" label="User Panel" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="tickets" label="Support Tickets" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="battles" label="Battle Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="timeline" label="Timeline Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
@@ -1105,18 +1274,10 @@ function AdminPanel() {
           )}
         </div>
 
-        {activeTab === "tickets" && (
+        {activeTab === "users" && (
           <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-bold">Active Support Tickets ({tickets.length})</h2>
-              {tickets.length > 0 && (
-                <button 
-                  onClick={handleClearAllTickets}
-                  className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 px-4 py-2 rounded-xl transition-all font-bold text-xs"
-                >
-                  Clear All
-                </button>
-              )}
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold">User Panel</h2>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
@@ -1141,6 +1302,53 @@ function AdminPanel() {
               <div className="mb-4 text-xs font-bold text-red-400">{userSummaryError}</div>
             )}
 
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+              <div className="bg-[var(--card-bg)]/50 border border-emerald-400/20 rounded-2xl p-4">
+                <p className="text-[10px] uppercase tracking-widest font-black text-emerald-300">Last.fm Connected Usernames</p>
+                <div className="mt-3 max-h-48 overflow-y-auto pr-1 space-y-1">
+                  {connectedUsernames.length === 0 ? (
+                    <p className="text-xs font-semibold text-[var(--text-secondary)]">No connected users found.</p>
+                  ) : (
+                    connectedUsernames.map((name, idx) => (
+                      <p key={`connected-${name}-${idx}`} className="text-sm font-semibold text-[var(--text-primary)] break-all">
+                        {name}
+                      </p>
+                    ))
+                  )}
+                </div>
+              </div>
+              <div className="bg-[var(--card-bg)]/50 border border-rose-400/20 rounded-2xl p-4">
+                <p className="text-[10px] uppercase tracking-widest font-black text-rose-300">No Last.fm Usernames</p>
+                <div className="mt-3 max-h-48 overflow-y-auto pr-1 space-y-1">
+                  {notConnectedUsernames.length === 0 ? (
+                    <p className="text-xs font-semibold text-[var(--text-secondary)]">No offline users found.</p>
+                  ) : (
+                    notConnectedUsernames.map((name, idx) => (
+                      <p key={`offline-${name}-${idx}`} className="text-sm font-semibold text-[var(--text-primary)] break-all">
+                        {name}
+                      </p>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "tickets" && (
+          <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-2xl font-bold">Active Support Tickets ({filteredTickets.length})</h2>
+              {filteredTickets.length > 0 && (
+                <button 
+                  onClick={handleClearAllTickets}
+                  className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20 px-4 py-2 rounded-xl transition-all font-bold text-xs"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+
             {ticketsLoading && (
               <div className="mb-6 text-sm font-bold text-[var(--text-secondary)]">Loading support tickets...</div>
             )}
@@ -1148,7 +1356,7 @@ function AdminPanel() {
               <div className="mb-6 text-sm font-bold text-red-400">{ticketsError}</div>
             )}
 
-            {tickets.length === 0 ? (
+            {filteredTickets.length === 0 ? (
               <div className="text-center py-24 opacity-40 border-2 border-dashed border-[var(--accent)]/10 rounded-3xl">
                 <p className="text-xl italic">No support tickets found.</p>
               </div>
@@ -1159,17 +1367,15 @@ function AdminPanel() {
                     <thead className="bg-[var(--accent)]/5 border-b border-[var(--accent)]/20">
                       <tr>
                         <th className="p-6 font-black text-[10px] uppercase tracking-[0.2em] text-[var(--text-secondary)]">Date</th>
-                        <th className="p-6 font-black text-[10px] uppercase tracking-[0.2em] text-[var(--text-secondary)]">User ID</th>
                         <th className="p-6 font-black text-[10px] uppercase tracking-[0.2em] text-[var(--text-secondary)]">Platform</th>
                         <th className="p-6 font-black text-[10px] uppercase tracking-[0.2em] text-[var(--text-secondary)]">Query</th>
                         <th className="p-6 font-black text-[10px] uppercase tracking-[0.2em] text-[var(--text-secondary)] text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--accent)]/10">
-                      {tickets.map((ticket) => (
+                      {filteredTickets.map((ticket) => (
                         <tr key={ticket.id} className="hover:bg-[var(--accent)]/5 transition-colors group">
                           <td className="p-5 text-sm text-[var(--text-secondary)]">{ticket.timestamp}</td>
-                          <td className="p-5 font-bold">{ticket.userId}</td>
                           <td className="p-5">
                             <span className="bg-[var(--accent)]/10 text-[var(--accent)] px-3 py-1 rounded-full text-[10px] font-black uppercase">
                               {ticket.socialMedia}
