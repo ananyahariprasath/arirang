@@ -1,10 +1,8 @@
-import { useState } from "react";
 import useRegionalData from "../../hooks/useRegionalData";
 import { COUNTRY_PRESETS, COUNTRY_REGION_MAP, COUNTRY_TZ_MAP, FOCUS_PLAYLISTS, GLOBAL_DEFAULT, COUNTRY_MULTI_TZ_MAP } from "../../constants";
 import { formatResetTime, convertKSTToLocal, convertSpotifyReset } from "../../utils/time";
 
 function CountryModal({ selectedCountry, onClose, onSubmitProof }) {
-  const [activePlatform, setActivePlatform] = useState("spotify");
   const { regions } = useRegionalData();
 
   // 1. Try to find explicitly recorded data first (from dynamic source)
@@ -27,7 +25,7 @@ function CountryModal({ selectedCountry, onClose, onSubmitProof }) {
   
   const timezones = COUNTRY_MULTI_TZ_MAP[selectedCountry] || [data.tz];
 
-  const currentPlaylists = (data.playlists || FOCUS_PLAYLISTS)[activePlatform === "spotify" ? "spotify" : "appleMusic"] || [];
+  const currentPlaylists = (data.playlists || FOCUS_PLAYLISTS).spotify || [];
 
   return (
     <div className="fixed inset-0 z-[100] flex justify-center items-start md:items-center bg-black/40 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200" onClick={onClose}>
@@ -94,23 +92,12 @@ function CountryModal({ selectedCountry, onClose, onSubmitProof }) {
           </div>
         </div>
 
-        {/* Platform Selector */}
+        {/* Platform Label */}
         <div className="flex items-center justify-between mb-4 px-1">
           <h3 className="font-black text-xs uppercase tracking-widest text-[var(--text-primary)] opacity-80">Focus Playlists ({currentPlaylists.length})</h3>
-          <div className="flex bg-[var(--bg-secondary)] p-1 rounded-xl border border-white/5 shadow-inner">
-            <button 
-              onClick={() => setActivePlatform("spotify")}
-              className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activePlatform === "spotify" ? "bg-[#1DB954] text-black shadow-lg" : "opacity-40 hover:opacity-100"}`}
-            >
-              Spotify
-            </button>
-            <button 
-              onClick={() => setActivePlatform("apple")}
-              className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${activePlatform === "apple" ? "bg-[#FA2D48] text-white shadow-lg shadow-[#FA2D48]/20" : "opacity-40 hover:opacity-100"}`}
-            >
-              Apple
-            </button>
-          </div>
+          <span className="px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest bg-[#1DB954] text-black shadow-lg">
+            Spotify
+          </span>
         </div>
 
         {/* Playlist Grid - Scrollable with fixed height for 20 items */}
@@ -123,13 +110,12 @@ function CountryModal({ selectedCountry, onClose, onSubmitProof }) {
               rel="noopener noreferrer"
               className={`group bg-[var(--bg-secondary)]/30 border border-[var(--accent)]/10 hover:border-transparent 
                          rounded-xl p-4 flex items-center justify-between transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]
-                         ${activePlatform === "spotify" ? "hover:bg-[#1DB954] hover:shadow-lg hover:shadow-[#1DB954]/20" : "hover:bg-[#FA2D48] hover:shadow-lg hover:shadow-[#FA2D48]/20"}`}
+                         hover:bg-[#1DB954] hover:shadow-lg hover:shadow-[#1DB954]/20`}
             >
               <div className="flex flex-col">
-                <span className="text-[8px] font-black uppercase tracking-[0.2em] opacity-30 group-hover:opacity-60 transition-opacity mb-1">Focus Slot #{idx+1}</span>
-                <span className={`text-[11px] font-black tracking-tight transition-colors ${activePlatform === "spotify" ? "group-hover:text-black" : "group-hover:text-white"}`}>{pl.name}</span>
+                <span className="text-[11px] font-black tracking-tight transition-colors group-hover:text-black">{pl.name}</span>
               </div>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all bg-white/5 group-hover:bg-white/10 ${activePlatform === "spotify" ? "group-hover:text-black" : "group-hover:text-white"}`}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center transition-all bg-white/5 group-hover:bg-white/10 group-hover:text-black">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="7" y1="17" x2="17" y2="7"></line>
                   <polyline points="7 7 17 7 17 17"></polyline>
