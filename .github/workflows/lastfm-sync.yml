@@ -20,7 +20,7 @@ jobs:
             exit 1
           fi
 
-          HTTP_STATUS=$(curl -sS -o response.json -w "%{http_code}" \
+          HTTP_STATUS=$(curl -sS -L -o response.json -w "%{http_code}" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json" \
             "${SYNC_URL}")
