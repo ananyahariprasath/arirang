@@ -20,12 +20,18 @@ jobs:
             exit 1
           fi
 
+          SYNC_URL="${SYNC_URL%/}"
+          if [[ "${SYNC_URL}" == http://* ]]; then
+            SYNC_URL="https://${SYNC_URL#http://}"
+          fi
+
           HTTP_STATUS=$(curl -sS -L -o response.json -w "%{http_code}" \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             -H "Content-Type: application/json" \
             "${SYNC_URL}")
 
           echo "HTTP status: ${HTTP_STATUS}"
+          echo "Effective URL: ${SYNC_URL}"
           cat response.json
 
           if [ "${HTTP_STATUS}" -lt 200 ] || [ "${HTTP_STATUS}" -ge 300 ]; then
