@@ -390,6 +390,7 @@ function AdminPanel() {
   });
 
   const [playlistPlatform, setPlaylistPlatform] = useState("spotify");
+  const [selectedCountries, setSelectedCountries] = useState([]);
 
   const [countrySearch, setCountrySearch] = useState("");
   const [showCountryDrop, setShowCountryDrop] = useState(false);
@@ -441,16 +442,13 @@ function AdminPanel() {
   const regionValidation = useMemo(() => {
     const hints = [];
     const blocking = [];
-    const country = String(newRegion.country || "").trim();
     const region = String(newRegion.region || "").trim();
     const goal = String(newRegion.goal || "").trim();
     const tz = String(newRegion.tz || "").trim();
     const gFormUrl = String(newRegion.gFormUrl || "").trim();
 
-    if (!country) {
-      blocking.push("Select a country.");
-    } else if (!COUNTRIES.includes(country)) {
-      hints.push("Country is custom text. Pick from dropdown to avoid mismatches.");
+    if (selectedCountries.length === 0) {
+      blocking.push("Select at least one country.");
     }
     if (!region) blocking.push("Region is required.");
     if (!goal) blocking.push("Streaming goal is required.");
@@ -471,7 +469,7 @@ function AdminPanel() {
     }
 
     return { blocking, hints, isValid: blocking.length === 0 };
-  }, [newRegion]);
+  }, [newRegion, selectedCountries]);
 
   const overallHealthStatus = useMemo(() => {
     const entries = Object.values(healthChecks || {});
@@ -653,12 +651,21 @@ function AdminPanel() {
 
   const handleAddRegion = (e) => {
     e.preventDefault();
-    if (!newRegion.country || !newRegion.region || !newRegion.goal) {
+    if (selectedCountries.length === 0 || !newRegion.region || !newRegion.goal) {
       toast.show("Please fill necessary fields (Country, Region, Goal)", "error");
       return;
     }
 
-    addRegion(newRegion);
+    selectedCountries.forEach((country) => {
+      const region = COUNTRY_REGION_MAP[country] || newRegion.region;
+      const tz = COUNTRY_TZ_MAP[country] || newRegion.tz;
+      addRegion({
+        ...newRegion,
+        country,
+        region,
+        tz,
+      });
+    });
     
     // Reset Form
     setNewRegion({ 
@@ -673,7 +680,8 @@ function AdminPanel() {
     });
     setCountrySearch("");
     setShowCountryDrop(false);
-    toast.show(`${newRegion.country} Regional Info Saved! 💜`, "success");
+    setSelectedCountries([]);
+    toast.show(`Regional info saved for ${selectedCountries.length} countr${selectedCountries.length === 1 ? "y" : "ies"}! 💜`, "success");
   };
 
   const handleAddGalleryImage = (e) => {
@@ -716,20 +724,31 @@ function AdminPanel() {
   };
 
   const handleCountrySelect = (country) => {
+    if (!country || selectedCountries.includes(country)) {
+      setCountrySearch("");
+      setShowCountryDrop(false);
+      return;
+    }
     const region = COUNTRY_REGION_MAP[country] || "";
     // Priority: Specific country preset -> General region preset (mapped) -> Current state
     const preset = COUNTRY_PRESETS[country] || (region ? COUNTRY_PRESETS[region] : null);
     const countryTz = COUNTRY_TZ_MAP[country];
+    const nextCountries = [...selectedCountries, country];
+    const nextRegions = Array.from(
+      new Set(nextCountries.map((c) => COUNTRY_REGION_MAP[c] || "").filter(Boolean))
+    );
+    const autoRegion = nextRegions.length === 1 ? nextRegions[0] : "Multiple Regions";
     
     setNewRegion({
       ...newRegion,
       country,
-      region: region,
-      tz: countryTz || (preset ? preset.tz : newRegion.tz),
-      spotifyReset: preset ? preset.s : newRegion.spotifyReset,
-      appleReset: preset ? preset.a : newRegion.appleReset
+      region: autoRegion || newRegion.region || region,
+      tz: newRegion.tz || countryTz || (preset ? preset.tz : newRegion.tz),
+      spotifyReset: newRegion.spotifyReset || (preset ? preset.s : newRegion.spotifyReset),
+      appleReset: newRegion.appleReset || (preset ? preset.a : newRegion.appleReset)
     });
-    setCountrySearch(country);
+    setSelectedCountries((prev) => [...prev, country]);
+    setCountrySearch("");
     setShowCountryDrop(false);
   };
 
@@ -1166,7 +1185,7 @@ function AdminPanel() {
       <Header />
       
       <main className="max-w-7xl mx-auto px-6 md:px-12 lg:px-16 py-12">
-        <div className="sticky top-[68px] z-40 bg-[var(--bg-primary)]/80 backdrop-blur-md pb-6 mb-12 border-b border-[var(--accent)]/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div className="sticky top-[68px] z-[80] bg-[var(--bg-primary)]/80 backdrop-blur-md pb-6 mb-12 border-b border-[var(--accent)]/10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
           <div>
             <h1 className="text-4xl font-black text-[var(--accent)] tracking-tight">Admin Dashboard</h1>
             {lastSyncStatus ? (
@@ -1209,9 +1228,9 @@ function AdminPanel() {
             {isMenuOpen && (
               <>
                 {/* Backdrop to close menu when clicking outside */}
-                <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
+                <div className="fixed inset-0 z-[70]" onClick={() => setIsMenuOpen(false)} />
                 
-                <div className="absolute top-full right-0 md:left-0 md:right-auto mt-3 w-56 bg-[var(--bg-primary)]/90 backdrop-blur-3xl border border-[var(--accent)]/40 p-2 rounded-2xl shadow-2xl z-50 flex flex-col gap-1 animate-in slide-in-from-top-2 fade-in duration-200">
+                <div className="fixed left-4 right-4 top-[120px] w-auto bg-[var(--card-bg)] border border-[var(--accent)]/40 p-2 rounded-2xl shadow-2xl z-[90] flex flex-col gap-1 animate-in slide-in-from-top-2 fade-in duration-200 md:absolute md:left-0 md:right-auto md:top-full md:mt-3 md:w-56">
                   <MenuButton tab="users" label="User Panel" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="tickets" label="Support Tickets" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="battles" label="Battle Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
@@ -2343,7 +2362,6 @@ function AdminPanel() {
                         onFocus={() => setShowCountryDrop(true)}
                         onChange={(e) => {
                           setCountrySearch(e.target.value);
-                          setNewRegion({...newRegion, country: e.target.value});
                           setShowCountryDrop(true);
                         }}
                         className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
@@ -2362,6 +2380,31 @@ function AdminPanel() {
                           ))}
                         </div>
                       )}
+                      {selectedCountries.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {selectedCountries.map((c) => (
+                            <span key={c} className="inline-flex items-center gap-2 rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[var(--accent)]">
+                              {c}
+                              <button
+                                type="button"
+                                onClick={() => setSelectedCountries((prev) => prev.filter((x) => x !== c))}
+                                className="text-[12px] leading-none opacity-60 hover:opacity-100"
+                                aria-label={`Remove ${c}`}
+                                title={`Remove ${c}`}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCountries([])}
+                            className="text-[10px] font-black uppercase tracking-widest text-red-300 hover:text-red-200"
+                          >
+                            Clear all
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                     <div>
                       <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Region</label>
@@ -2401,16 +2444,6 @@ function AdminPanel() {
                         className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                       />
                     </div>
-                    <div>
-                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Google Form URL</label>
-                      <input 
-                        type="text" 
-                        placeholder="https://forms.gle/..."
-                        value={newRegion.gFormUrl}
-                        onChange={(e) => setNewRegion({...newRegion, gFormUrl: e.target.value})}
-                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
-                      />
-                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2424,6 +2457,7 @@ function AdminPanel() {
                         className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                       />
                     </div>
+                    {/*
                     <div>
                       <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Apple Reset</label>
                       <input 
@@ -2434,50 +2468,38 @@ function AdminPanel() {
                         className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                       />
                     </div>
+                    */}
                   </div>
                   
                   {/* Playlist management restored and expanded to 20 slots */}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Focus Playlists (20 Slots)</label>
-                      <div className="flex bg-[var(--bg-primary)] p-1 rounded-xl border border-[var(--accent)]/20 shadow-inner">
-                        <button 
-                          type="button"
-                          onClick={() => setPlaylistPlatform("spotify")}
-                          className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${playlistPlatform === 'spotify' ? 'bg-[#1DB954] text-black shadow-lg shadow-[#1DB954]/20' : 'opacity-40 hover:opacity-100 hover:text-[#1DB954]'}`}
-                        >
-                          Spotify
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => setPlaylistPlatform("appleMusic")}
-                          className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${playlistPlatform === 'appleMusic' ? 'bg-[#FA2D48] text-white shadow-lg shadow-[#FA2D48]/20' : 'opacity-40 hover:opacity-100 hover:text-[#FA2D48]'}`}
-                        >
-                          Apple
-                        </button>
+                      <div className="flex bg-[var(--bg-primary)] px-3 py-1.5 rounded-xl border border-[var(--accent)]/20 shadow-inner">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-[#1DB954]">Spotify</span>
                       </div>
                     </div>
 
                     <div className="bg-[var(--bg-primary)]/50 p-4 rounded-2xl border border-[var(--accent)]/10 max-h-[300px] overflow-y-auto custom-scrollbar shadow-inner">
                       <div className="grid grid-cols-1 gap-3">
-                        {(newRegion.playlists[playlistPlatform] || []).map((pl, idx) => (
+                        {(newRegion.playlists.spotify || []).map((pl, idx) => (
                           <div key={idx} className="bg-[var(--card-bg)]/40 p-3.5 rounded-xl space-y-2.5 border border-[var(--accent)]/5 shadow-sm hover:border-[var(--accent)]/20 transition-all group/slot">
                             <div className="flex justify-between items-center">
                               <span className="text-[8px] font-black uppercase opacity-30 tracking-widest group-hover/slot:opacity-60 transition-opacity">#{idx + 1} Focus Slot</span>
-                              <div className={`w-1 h-1 rounded-full ${playlistPlatform === 'spotify' ? 'bg-[#1DB954]' : 'bg-[#FA2D48]'} opacity-20`}></div>
+                              <div className="w-1 h-1 rounded-full bg-[#1DB954] opacity-20"></div>
                             </div>
                             <input 
                               type="text"
                               placeholder="Playlist Name"
                               value={pl.name}
-                              onChange={(e) => updatePlaylistField(playlistPlatform, idx, "name", e.target.value)}
+                              onChange={(e) => updatePlaylistField("spotify", idx, "name", e.target.value)}
                               className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/10 p-2.5 rounded-lg text-[11px] font-bold focus:outline-none focus:border-[var(--accent)] transition-all placeholder:opacity-20"
                             />
                             <input 
                               type="text"
                               placeholder="Streaming URL (https://...)"
                               value={pl.url}
-                              onChange={(e) => updatePlaylistField(playlistPlatform, idx, "url", e.target.value)}
+                              onChange={(e) => updatePlaylistField("spotify", idx, "url", e.target.value)}
                               className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/10 p-2.5 rounded-lg text-[10px] font-mono focus:outline-none focus:border-[var(--accent)] transition-all placeholder:opacity-20 opacity-60 focus:opacity-100"
                             />
                           </div>

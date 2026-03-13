@@ -782,70 +782,6 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
                 </div>
                 </div>
 
-                {view === "create" ? (
-                  <div className="rounded-2xl border border-[var(--accent)]/20 bg-[var(--card-bg)]/30 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Create Room</p>
-                      <button onClick={() => setView("landing")} className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--accent)]">Back</button>
-                    </div>
-
-                    <input value={draft.title} onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))} placeholder="Room title" className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/25 rounded-xl px-3 py-2 text-sm font-semibold" />
-                    <textarea value={draft.description} onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))} placeholder="Short description (optional)" rows={2} className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/25 rounded-xl px-3 py-2 text-sm font-semibold resize-none" />
-                    <div className="rounded-xl border border-[var(--accent)]/20 p-3">
-                      <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Title Card Image</p>
-                      {draftCoverImageData ? (
-                        <div className="mt-2 flex items-center gap-3">
-                          <img src={draftCoverImageData} alt={draftCoverImageName || "title card"} className="w-14 h-14 rounded-lg object-cover border border-[var(--accent)]/20" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-semibold truncate">{draftCoverImageName || "image"}</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDraftCoverImageData("");
-                              setDraftCoverImageName("");
-                            }}
-                            className="px-2.5 py-1 rounded-lg border border-red-400/40 text-red-300 text-[9px] font-black uppercase tracking-widest hover:bg-red-500/10 transition-all"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ) : (
-                        <p className="mt-2 text-xs font-semibold text-[var(--text-secondary)]">No image selected. Default card image will be used.</p>
-                      )}
-                      <label className="mt-2 inline-flex px-3 py-2 rounded-lg border border-[var(--accent)]/30 text-[var(--accent)] text-[10px] font-black uppercase tracking-widest bg-[var(--accent)]/5 hover:bg-[var(--accent)]/15 transition-all cursor-pointer">
-                        Upload from device
-                        <input type="file" accept="image/*" className="hidden" onChange={handleSelectDraftCoverImage} />
-                      </label>
-                    </div>
-
-                    {isAdmin ? (
-                      <label className="text-xs font-bold block">Duration (mins)
-                        <input
-                          type="number"
-                          min={5}
-                          max={120}
-                          value={draft.durationMins}
-                          onChange={(e) => setDraft((p) => ({ ...p, durationMins: e.target.value }))}
-                          className="mt-1 w-full bg-[var(--bg-primary)] border border-[var(--accent)]/25 rounded-xl px-3 py-2 text-sm font-semibold"
-                        />
-                        <p className="mt-1 text-[10px] font-semibold text-[var(--text-secondary)]">Max room duration is 120 minutes (2 hours).</p>
-                      </label>
-                    ) : (
-                      <div className="text-xs font-bold">
-                        <p>Duration (mins)</p>
-                        <p className="mt-1 text-[10px] font-semibold text-[var(--text-secondary)]">
-                          Uses admin default timer: {config.defaultDurationMins} minutes.
-                        </p>
-                      </div>
-                    )}
-
-                    <button onClick={handleCreateRoom} disabled={!canCreateRoom} className="px-4 py-2.5 rounded-xl border border-[var(--accent)]/40 bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent)]/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                      Create Room
-                    </button>
-                  </div>
-                ) : null}
-
                 {view === "join" ? (
                   <div className="rounded-2xl border border-[var(--accent)]/20 bg-[var(--card-bg)]/30 p-4 space-y-3">
                     <div className="flex items-center justify-between">
@@ -1082,6 +1018,74 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
           <div className="relative w-full max-w-5xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <button type="button" onClick={() => setPreviewImage(null)} className="absolute -top-3 -right-2 sm:top-2 sm:right-2 z-10 px-3 py-1.5 rounded-full border border-white/30 bg-black/50 text-white text-xs font-black uppercase tracking-widest hover:bg-black/80 transition-all">Close</button>
             <img src={previewImage.src} alt={previewImage.name || "preview"} className="w-full max-h-[90vh] object-contain rounded-2xl border border-white/20 bg-black/40" />
+          </div>
+        </div>
+      ) : null}
+
+      {view === "create" ? (
+        <div className="fixed inset-0 z-[110] bg-black/40 backdrop-blur-sm p-4 sm:p-8 flex items-center justify-center" onClick={() => setView("landing")}>
+          <div className="w-full max-w-xl max-h-[85vh] overflow-y-auto no-scrollbar rounded-2xl border border-[var(--accent)]/25 bg-[var(--card-bg)] shadow-2xl p-4 sm:p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Create Room</p>
+              <button onClick={() => setView("landing")} className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] hover:text-[var(--accent)]">Close</button>
+            </div>
+
+            <div className="mt-3 space-y-3">
+              <input value={draft.title} onChange={(e) => setDraft((p) => ({ ...p, title: e.target.value }))} placeholder="Room title" className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/25 rounded-xl px-3 py-2 text-sm font-semibold" />
+              <textarea value={draft.description} onChange={(e) => setDraft((p) => ({ ...p, description: e.target.value }))} placeholder="Short description (optional)" rows={2} className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/25 rounded-xl px-3 py-2 text-sm font-semibold resize-none" />
+              <div className="rounded-xl border border-[var(--accent)]/20 p-3">
+                <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Title Card Image</p>
+                {draftCoverImageData ? (
+                  <div className="mt-2 flex items-center gap-3">
+                    <img src={draftCoverImageData} alt={draftCoverImageName || "title card"} className="w-14 h-14 rounded-lg object-cover border border-[var(--accent)]/20" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold truncate">{draftCoverImageName || "image"}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDraftCoverImageData("");
+                        setDraftCoverImageName("");
+                      }}
+                      className="px-2.5 py-1 rounded-lg border border-red-400/40 text-red-300 text-[9px] font-black uppercase tracking-widest hover:bg-red-500/10 transition-all"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs font-semibold text-[var(--text-secondary)]">No image selected. Default card image will be used.</p>
+                )}
+                <label className="mt-2 inline-flex px-3 py-2 rounded-lg border border-[var(--accent)]/30 text-[var(--accent)] text-[10px] font-black uppercase tracking-widest bg-[var(--accent)]/5 hover:bg-[var(--accent)]/15 transition-all cursor-pointer">
+                  Upload from device
+                  <input type="file" accept="image/*" className="hidden" onChange={handleSelectDraftCoverImage} />
+                </label>
+              </div>
+
+              {isAdmin ? (
+                <label className="text-xs font-bold block">Duration (mins)
+                  <input
+                    type="number"
+                    min={5}
+                    max={120}
+                    value={draft.durationMins}
+                    onChange={(e) => setDraft((p) => ({ ...p, durationMins: e.target.value }))}
+                    className="mt-1 w-full bg-[var(--bg-primary)] border border-[var(--accent)]/25 rounded-xl px-3 py-2 text-sm font-semibold"
+                  />
+                  <p className="mt-1 text-[10px] font-semibold text-[var(--text-secondary)]">Max room duration is 120 minutes (2 hours).</p>
+                </label>
+              ) : (
+                <div className="text-xs font-bold">
+                  <p>Duration (mins)</p>
+                  <p className="mt-1 text-[10px] font-semibold text-[var(--text-secondary)]">
+                    Uses admin default timer: {config.defaultDurationMins} minutes.
+                  </p>
+                </div>
+              )}
+
+              <button onClick={handleCreateRoom} disabled={!canCreateRoom} className="w-full px-4 py-2.5 rounded-xl border border-[var(--accent)]/40 bg-[var(--accent)]/10 text-[var(--accent)] text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent)]/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                Create Room
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
