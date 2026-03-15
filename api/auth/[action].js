@@ -89,6 +89,10 @@ function toUsernameKey(value = "") {
   return String(value || "").trim().toLowerCase();
 }
 
+function toReferralKey(value = "") {
+  return String(value || "").trim().toLowerCase();
+}
+
 function toEmailKey(value = "") {
   return String(value || "").trim().toLowerCase();
 }
@@ -349,6 +353,7 @@ async function handleLogin(req, res) {
       lastfmUsername: user.lastfmUsername || null,
       country: user.country || null,
       region: user.region || null,
+      referralCode: user.referralCode || user.username || null,
       onboardingComplete: Boolean(user.onboardingComplete),
       onboardingSnoozeUntil: user.onboardingSnoozeUntil || null,
     },
@@ -364,6 +369,8 @@ async function handleSignup(req, res) {
   if (!email || !password || !username || !country || !region) {
     return res.status(400).json({ error: "Email, password, username, country, and region are required" });
   }
+
+  const referralCodeRaw = String(req.body?.referralCode || "").trim();
 
   const normalizedUsername = String(username || "").trim();
   const usernameKey = toUsernameKey(normalizedUsername);
@@ -386,6 +393,7 @@ async function handleSignup(req, res) {
 
   const db = await getDb();
   const usersCollection = db.collection("users");
+  const referralsCollection = db.collection("referrals");
 
   const existingUser = await usersCollection.findOne({
     $or: [
@@ -409,25 +417,83 @@ async function handleSignup(req, res) {
     return res.status(400).json({ error: "Username is already in use" });
   }
 
+  let referrer = null;
+  let referralCodeKey = "";
+  if (referralCodeRaw) {
+    referralCodeKey = toReferralKey(referralCodeRaw);
+    referrer = await usersCollection.findOne(
+      {
+        $or: [
+          { referralCodeKey },
+          { usernameKey: referralCodeKey },
+          { username: new RegExp(`^${escapeRegex(referralCodeKey)}$`, "i") },
+        ],
+      },
+      { projection: { _id: 1, username: 1, email: 1 } }
+    );
+    if (!referrer) {
+      return res.status(400).json({ error: "Invalid referral code" });
+    }
+  }
+
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(password, salt);
 
   const now = new Date();
+  const derivedReferralCode = normalizedUsername;
   const newUser = {
     email: normalizedEmail,
     emailKey: normalizedEmail,
     username: normalizedUsername,
     usernameKey,
+    referralCode: derivedReferralCode,
+    referralCodeKey: toReferralKey(derivedReferralCode),
     password: hashedPassword,
     country,
     region,
     role: "user",
     onboardingComplete: false,
     onboardingSnoozeUntil: null,
+    referredBy: referrer ? referrer._id.toString() : null,
+    referralAcceptedAt: referrer ? now : null,
+    referralCount: 0,
+    referralVerifiedCount: 0,
     createdAt: now,
   };
 
   const result = await usersCollection.insertOne(newUser);
+
+  if (referrer) {
+    const referredUserId = result.insertedId.toString();
+    try {
+      const insertResult = await referralsCollection.updateOne(
+        { referredUserId },
+        {
+          $setOnInsert: {
+            referrerId: referrer._id.toString(),
+            referrerUsername: String(referrer.username || ""),
+            referredUserId,
+            referralCodeKey,
+            status: "verified",
+            createdAt: now,
+          },
+        },
+        { upsert: true }
+      );
+
+      if (insertResult.upsertedCount || insertResult.matchedCount === 0) {
+        await usersCollection.updateOne(
+          { _id: referrer._id },
+          {
+            $inc: { referralCount: 1, referralVerifiedCount: 1 },
+            $set: { referralUpdatedAt: now },
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Failed to record referral:", error);
+    }
+  }
 
   const token = jwt.sign(
     { id: result.insertedId.toString(), email: normalizedEmail, role: newUser.role },
@@ -447,6 +513,7 @@ async function handleSignup(req, res) {
       region: newUser.region,
       profilePicture: null,
       lastfmUsername: null,
+      referralCode: newUser.referralCode,
       onboardingComplete: false,
       onboardingSnoozeUntil: null,
     },
@@ -1411,6 +1478,51 @@ async function handleUsersSummary(req, res) {
   });
 }
 
+async function handleReferralStats(req, res) {
+  if (req.method !== "GET") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const decoded = verifyUserRequest(req, res);
+  if (!decoded) return;
+
+  const userId = String(decoded.id || "").trim();
+  if (!ObjectId.isValid(userId)) {
+    return res.status(400).json({ error: "Invalid user id" });
+  }
+
+  const db = await getDb();
+  const usersCollection = db.collection("users");
+  const referralsCollection = db.collection("referrals");
+
+  const user = await usersCollection.findOne(
+    { _id: new ObjectId(userId) },
+    { projection: { referralCode: 1, username: 1, referralCount: 1, referralVerifiedCount: 1 } }
+  );
+  if (!user) {
+    return res.status(404).json({ error: "User not found" });
+  }
+
+  const recent = await referralsCollection
+    .find({ referrerId: userId }, { sort: { createdAt: -1 }, limit: 10 })
+    .project({ _id: 0, referredUserId: 1, createdAt: 1, status: 1 })
+    .toArray();
+
+  return res.status(200).json({
+    success: true,
+    referralCode: user.referralCode || user.username || null,
+    totals: {
+      total: Number(user.referralCount || 0),
+      verified: Number(user.referralVerifiedCount || 0),
+    },
+    recent: recent.map((row) => ({
+      referredUserId: String(row.referredUserId || ""),
+      status: String(row.status || "verified"),
+      createdAt: row.createdAt ? new Date(row.createdAt).toISOString() : null,
+    })),
+  });
+}
+
 async function handleLastfmSyncNow(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -1852,6 +1964,8 @@ export default async function handler(req, res) {
         return await handleUsersSummary(req, res);
       case "lastfm-sync-now":
         return await handleLastfmSyncNow(req, res);
+      case "referral-stats":
+        return await handleReferralStats(req, res);
       case "top-scrobblers":
         return await handleTopScrobblers(req, res);
       case "public-top-scrobblers":

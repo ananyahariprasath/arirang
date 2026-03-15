@@ -6,6 +6,7 @@ import useRegionalData from "../hooks/useRegionalData";
 import useModStatus from "../hooks/useModStatus";
 import useGalleryData from "../hooks/useGalleryData";
 import useDailyUpdates from "../hooks/useDailyUpdates";
+import useDailyMissions from "../hooks/useDailyMissions";
 import { useToast } from "../context/ToastContext";
 import { useAuth } from "../context/AuthContext";
 import { COUNTRY_PRESETS, COUNTRY_REGION_MAP, COUNTRIES, COUNTRY_TZ_MAP, FOCUS_PLAYLISTS } from "../constants";
@@ -28,6 +29,20 @@ const TOPIC_ROOM_TEMPLATE = {
   activeRoomsLimit: 10,
   expiresIn: "2h 15m",
   category: "Streaming",
+};
+const MISSION_TYPE_OPTIONS = [
+  { value: "stream", label: "Streaming" },
+  { value: "share", label: "Share / Social" },
+  { value: "referral", label: "Referral" },
+  { value: "engagement", label: "Engagement" },
+  { value: "custom", label: "Custom" }
+];
+const MISSION_TYPE_DEFAULT_UNITS = {
+  stream: "plays",
+  share: "shares",
+  referral: "verified signups",
+  engagement: "actions",
+  custom: "actions"
 };
 
 function AdminViewPanel() {
@@ -343,17 +358,23 @@ function AdminPanel() {
   const [activeBattleNotificationLoading, setActiveBattleNotificationLoading] = useState(false);
   const [cancelCustomNotifLoading, setCancelCustomNotifLoading] = useState(false);
   const [scheduledBattleNotifications, setScheduledBattleNotifications] = useState([]);
+  const [luckyDrawEntries, setLuckyDrawEntries] = useState([]);
+  const [luckyDrawLoading, setLuckyDrawLoading] = useState(true);
+  const [luckyDrawError, setLuckyDrawError] = useState("");
+  const [luckyDrawFilter, setLuckyDrawFilter] = useState("");
+  const [luckyDrawSort, setLuckyDrawSort] = useState("username_asc");
   const { battles, liveBattles, addBattle, updateBattle, updateLiveBattles, deleteBattle, clearBattles, resetLiveBattles, loading: battlesLoading } = useBattles();
   const { events, addEvent, updateEvent, deleteEvent, clearTimeline, resetToDefault, loading: timelineLoading } = useTimeline();
   const { regions, addRegion, deleteRegion, resetRegions, loading: regionsLoading } = useRegionalData();
   const { mods, toggleStatus, updateModDetails, resetMods, loading: modsLoading } = useModStatus();
   const { galleryImages, loading: galleryLoading, resetGallery, addGalleryImage, deleteGalleryImage, updateGalleryImage } = useGalleryData();
-  const { updates, latestUpdate, addUpdate, deleteUpdate, clearUpdates, loading: updatesLoading } = useDailyUpdates();
+  const { updates, latestUpdate, addUpdate, updateUpdate, deleteUpdate, clearUpdates, loading: updatesLoading } = useDailyUpdates();
+  const { missions, addMission, updateMission, deleteMission, clearMissions, resetMissions, loading: missionsLoading } = useDailyMissions();
   const toast = useToast();
   const { token, user } = useAuth();
   const lastBattleNotificationIdRef = useRef("");
 
-  const isDataLoading = regionsLoading || modsLoading || battlesLoading || timelineLoading || galleryLoading || updatesLoading;
+  const isDataLoading = regionsLoading || modsLoading || battlesLoading || timelineLoading || galleryLoading || updatesLoading || missionsLoading;
   
   // New Battle History Form State
   const [newBattle, setNewBattle] = useState({
@@ -406,6 +427,42 @@ function AdminPanel() {
   const [editingEvent, setEditingEvent] = useState(null);
   const [dailyUpdateDraft, setDailyUpdateDraft] = useState({ title: "", message: "", imageUrl: "", quote: "", uploadedImageData: "", uploadedImageName: "" });
   const [previewUpdateId, setPreviewUpdateId] = useState(null);
+  const [editingUpdateId, setEditingUpdateId] = useState(null);
+  const [missionDraft, setMissionDraft] = useState({
+    title: "",
+    description: "",
+    type: "stream",
+    target: 1,
+    unit: "plays",
+    autoCheck: true,
+    active: true
+  });
+  const [editingMissionId, setEditingMissionId] = useState(null);
+  const [editingMission, setEditingMission] = useState(null);
+
+  const filteredLuckyDrawEntries = useMemo(() => {
+    const term = String(luckyDrawFilter || "").trim().toLowerCase();
+    const base = term
+      ? luckyDrawEntries.filter((entry) => {
+          return [
+            entry.username,
+            entry.email,
+            entry.platform,
+            entry.handle,
+            entry.dateKey,
+          ].some((field) => String(field || "").toLowerCase().includes(term));
+        })
+      : luckyDrawEntries;
+    const sorted = [...base].sort((a, b) => {
+      const nameA = String(a.username || "").toLowerCase();
+      const nameB = String(b.username || "").toLowerCase();
+      return nameA.localeCompare(nameB, undefined, { sensitivity: "base" });
+    });
+    if (luckyDrawSort === "username_desc") {
+      return sorted.reverse();
+    }
+    return sorted;
+  }, [luckyDrawEntries, luckyDrawFilter, luckyDrawSort]);
 
   const battleValidation = useMemo(() => {
     const hints = [];
@@ -580,6 +637,40 @@ function AdminPanel() {
     };
   }, [activeTab, token]);
 
+  useEffect(() => {
+    if (activeTab !== "lucky-draw") return;
+    if (!token) return;
+    let active = true;
+
+    const loadLuckyDrawEntries = async () => {
+      setLuckyDrawLoading(true);
+      setLuckyDrawError("");
+      try {
+        const response = await fetch("/api/lucky-draw?admin=1", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load lucky draw entries");
+        }
+        if (active) {
+          setLuckyDrawEntries(Array.isArray(data?.entries) ? data.entries : []);
+        }
+      } catch (error) {
+        if (active) setLuckyDrawError(error.message || "Failed to load lucky draw entries");
+      } finally {
+        if (active) setLuckyDrawLoading(false);
+      }
+    };
+
+    loadLuckyDrawEntries();
+    const intervalId = setInterval(loadLuckyDrawEntries, 30000);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, [activeTab, token]);
+
   const handleClearAllTickets = async () => {
     if (confirm("Are you sure you want to clear all tickets? This cannot be undone.")) {
       try {
@@ -700,6 +791,90 @@ function AdminPanel() {
     addGalleryImage(newGalleryImage);
     setNewGalleryImage({ src: "", type: "square" });
     toast.show("Image added to gallery pool! 💜", "success");
+  };
+
+  const applyMissionTypeDefaults = useCallback((type, prev) => {
+    const fallbackUnit = MISSION_TYPE_DEFAULT_UNITS[type] || "actions";
+    const prevUnit = prev.unit?.trim();
+    const prevDefault = MISSION_TYPE_DEFAULT_UNITS[prev.type] || "actions";
+    const nextUnit = !prevUnit || prevUnit === prevDefault ? fallbackUnit : prevUnit;
+    return { ...prev, type, unit: nextUnit };
+  }, []);
+
+  const handleAddMission = (e) => {
+    e.preventDefault();
+    if (!missionDraft.title.trim() || !missionDraft.description.trim()) {
+      toast.show("Please provide a mission title and description.", "error");
+      return;
+    }
+    if (!missionDraft.target || Number(missionDraft.target) <= 0) {
+      toast.show("Please set a valid target value.", "error");
+      return;
+    }
+
+    addMission({
+      ...missionDraft,
+      target: Number(missionDraft.target)
+    });
+    setMissionDraft({
+      title: "",
+      description: "",
+      type: "stream",
+      target: 1,
+      unit: MISSION_TYPE_DEFAULT_UNITS.stream,
+      autoCheck: true,
+      active: true
+    });
+    toast.show("Daily mission added.", "success");
+  };
+
+  const handleDownloadLuckyDrawCsv = () => {
+    if (!luckyDrawEntries.length) {
+      toast.show("No lucky draw entries to export.", "info");
+      return;
+    }
+    const headers = ["dateKey", "username", "email", "platform", "handle"];
+    const escapeCsv = (value) => {
+      const raw = String(value ?? "");
+      if (raw.includes(",") || raw.includes("\"") || raw.includes("\n")) {
+        return `"${raw.replace(/\"/g, "\"\"")}"`;
+      }
+      return raw;
+    };
+    const rows = filteredLuckyDrawEntries.map((entry) => ([
+      escapeCsv(entry.dateKey || ""),
+      escapeCsv(entry.username || ""),
+      escapeCsv(entry.email || ""),
+      escapeCsv(entry.platform || ""),
+      escapeCsv(entry.handle || ""),
+    ].join(",")));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `lucky_draw_entries_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDeleteLuckyDrawEntry = async (entryId) => {
+    if (!token) return;
+    if (!confirm("Delete this lucky draw entry?")) return;
+    try {
+      const response = await fetch(`/api/lucky-draw?id=${encodeURIComponent(entryId)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete entry");
+      }
+      setLuckyDrawEntries((prev) => prev.filter((entry) => String(entry.id) !== String(entryId)));
+      toast.show("Entry deleted.", "success");
+    } catch (error) {
+      toast.show(error.message || "Failed to delete entry", "error");
+    }
   };
 
   const updatePlaylistField = (platform, index, field, value) => {
@@ -1217,6 +1392,8 @@ function AdminPanel() {
                   .replace("timeline", "Timeline")
                   .replace("regions", "Regions")
                   .replace("mods", "Mods")
+                  .replace("lucky-draw", "Lucky Draw")
+                  .replace("missions", "Daily Missions")
                   .replace("updates", "Daily Updates")
                   .replace("global", "Global Config")
                   .replace("battles", "Battles")
@@ -1237,6 +1414,8 @@ function AdminPanel() {
                   <MenuButton tab="timeline" label="Timeline Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="regions" label="Region Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="mods" label="Mod Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
+                  <MenuButton tab="lucky-draw" label="Lucky Draw" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
+                  <MenuButton tab="missions" label="Daily Missions" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="updates" label="Daily Updates" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="gallery" label="Gallery Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="global" label="Global Config" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
@@ -2544,6 +2723,354 @@ function AdminPanel() {
             toast={toast}
           />
         )}
+        {activeTab === "lucky-draw" && (
+          <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <h2 className="text-2xl font-bold">Lucky Draw Entries ({filteredLuckyDrawEntries.length})</h2>
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <input
+                  value={luckyDrawFilter}
+                  onChange={(e) => setLuckyDrawFilter(e.target.value)}
+                  placeholder="Filter by name, email, handle..."
+                  className="w-full sm:w-64 bg-[var(--bg-primary)]/60 border border-[var(--accent)]/20 px-3 py-2 rounded-xl text-xs font-semibold outline-none focus:border-[var(--accent)]"
+                />
+                <button
+                  onClick={handleDownloadLuckyDrawCsv}
+                  className="px-3 py-2 rounded-xl border border-[var(--accent)]/30 text-[var(--accent)] text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent)]/10 transition-all"
+                >
+                  Download CSV
+                </button>
+              </div>
+            </div>
+
+            {luckyDrawLoading && (
+              <div className="mb-4 text-sm font-bold text-[var(--text-secondary)]">Loading entries...</div>
+            )}
+            {luckyDrawError && (
+              <div className="mb-4 text-sm font-bold text-red-400">{luckyDrawError}</div>
+            )}
+
+            <div className="bg-[var(--card-bg)]/40 backdrop-blur-xl border border-[var(--accent)]/40 rounded-3xl overflow-hidden shadow-2xl">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left min-w-[900px]">
+                  <thead className="bg-[var(--accent)]/5 border-b border-[var(--accent)]/20">
+                    <tr>
+                      <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Date</th>
+                      <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">
+                        <button
+                          onClick={() => setLuckyDrawSort((prev) => (prev === "username_asc" ? "username_desc" : "username_asc"))}
+                          className="inline-flex items-center gap-1 hover:text-[var(--accent)] transition-colors"
+                          title="Sort by username"
+                        >
+                          Username
+                          <span className="text-[9px]">
+                            {luckyDrawSort === "username_desc" ? "↓" : "↑"}
+                          </span>
+                        </button>
+                      </th>
+                      <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Email</th>
+                      <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Platform</th>
+                      <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Handle</th>
+                      <th className="p-4 font-black text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--accent)]/10">
+                    {filteredLuckyDrawEntries.map((entry) => (
+                      <tr key={entry.id || `${entry.userId}-${entry.dateKey}`} className="hover:bg-[var(--accent)]/5 transition-colors">
+                        <td className="p-4 text-xs">{entry.dateKey || "-"}</td>
+                        <td className="p-4 text-sm font-bold">{entry.username || "-"}</td>
+                        <td className="p-4 text-sm">{entry.email || "-"}</td>
+                        <td className="p-4 text-sm uppercase">{entry.platform || "-"}</td>
+                        <td className="p-4 text-sm">{entry.handle || "-"}</td>
+                        <td className="p-4 text-sm">
+                          <button
+                            onClick={() => handleDeleteLuckyDrawEntry(entry.id)}
+                            className="px-2.5 py-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredLuckyDrawEntries.length === 0 && !luckyDrawLoading && (
+                      <tr>
+                        <td colSpan={6} className="p-6 text-sm text-[var(--text-secondary)] text-center">
+                          No entries yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        )}
+        {activeTab === "missions" && (
+          <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-8">
+              <div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-4">
+                  <h2 className="text-2xl font-bold">Daily Missions ({missions.length})</h2>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => { if (confirm("Reset daily missions to defaults?")) resetMissions(); }}
+                      className="text-xs font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest"
+                    >
+                      Reset to Default
+                    </button>
+                    <button
+                      onClick={() => { if (confirm("Clear all daily missions?")) clearMissions(); }}
+                      className="text-xs font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest"
+                    >
+                      Clear All
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[11px] font-semibold text-[var(--text-secondary)] mb-6">
+                  Auto-verified missions are expected to be checked by the backend (streams, referrals, and engagement).
+                </p>
+
+                {missionsLoading && (
+                  <div className="mb-4 text-sm font-bold text-[var(--text-secondary)]">Loading missions...</div>
+                )}
+
+                {missions.length === 0 && !missionsLoading ? (
+                  <div className="rounded-2xl border border-[var(--accent)]/15 bg-[var(--card-bg)]/40 p-6 text-sm font-semibold text-[var(--text-secondary)]">
+                    No missions yet. Add one on the right.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {missions.map((mission) => {
+                      const isEditing = editingMissionId === mission.id;
+                      return (
+                        <div key={mission.id} className="bg-[var(--card-bg)]/40 rounded-3xl border border-[var(--accent)]/20 overflow-hidden group">
+                          {isEditing && editingMission ? (
+                            <div className="p-5 space-y-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Title</label>
+                                  <input
+                                    type="text"
+                                    value={editingMission.title}
+                                    onChange={(e) => setEditingMission({ ...editingMission, title: e.target.value })}
+                                    className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Type</label>
+                                  <select
+                                    value={editingMission.type}
+                                    onChange={(e) => setEditingMission((prev) => applyMissionTypeDefaults(e.target.value, prev))}
+                                    className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]"
+                                  >
+                                    {MISSION_TYPE_OPTIONS.map((option) => (
+                                      <option key={option.value} value={option.value}>{option.label}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                              <div>
+                                <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Description</label>
+                                <textarea
+                                  rows={3}
+                                  value={editingMission.description}
+                                  onChange={(e) => setEditingMission({ ...editingMission, description: e.target.value })}
+                                  className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] resize-none"
+                                />
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                  <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Target</label>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={editingMission.target}
+                                    onChange={(e) => setEditingMission({ ...editingMission, target: Number(e.target.value) })}
+                                    className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Unit</label>
+                                  <input
+                                    type="text"
+                                    value={editingMission.unit}
+                                    onChange={(e) => setEditingMission({ ...editingMission, unit: e.target.value })}
+                                    className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)]"
+                                  />
+                                </div>
+                                <div className="flex items-center gap-3 pt-5">
+                                  <label className="text-[10px] font-black uppercase text-[var(--text-secondary)]">Active</label>
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(editingMission.active)}
+                                    onChange={(e) => setEditingMission({ ...editingMission, active: e.target.checked })}
+                                    className="w-4 h-4 accent-[var(--accent)]"
+                                  />
+                                  <label className="text-[10px] font-black uppercase text-[var(--text-secondary)] ml-2">Auto</label>
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(editingMission.autoCheck)}
+                                    onChange={(e) => setEditingMission({ ...editingMission, autoCheck: e.target.checked })}
+                                    className="w-4 h-4 accent-[var(--accent)]"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex gap-2 pt-1">
+                                <button
+                                  onClick={() => {
+                                    updateMission(mission.id, editingMission);
+                                    setEditingMissionId(null);
+                                    setEditingMission(null);
+                                    toast.show("Mission updated.", "success");
+                                  }}
+                                  className="flex-1 bg-[var(--accent)] text-black font-black py-2 rounded-xl text-xs hover:scale-[1.02] active:scale-95 transition-all"
+                                >
+                                  Save Changes
+                                </button>
+                                <button
+                                  onClick={() => { setEditingMissionId(null); setEditingMission(null); }}
+                                  className="px-4 py-2 rounded-xl text-xs font-bold border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                  <p className="text-sm font-black text-[var(--accent)] truncate">{mission.title}</p>
+                                  <span className="text-[9px] px-2 py-0.5 bg-[var(--accent)]/20 rounded font-black uppercase tracking-widest">
+                                    {mission.type}
+                                  </span>
+                                  {mission.autoCheck && (
+                                    <span className="text-[9px] px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded font-black uppercase tracking-widest">
+                                      auto
+                                    </span>
+                                  )}
+                                  {!mission.active && (
+                                    <span className="text-[9px] px-2 py-0.5 bg-red-500/20 text-red-400 rounded font-black uppercase tracking-widest">
+                                      paused
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] font-semibold text-[var(--text-primary)]/80 line-clamp-2 break-words">
+                                  {mission.description}
+                                </p>
+                                <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-[var(--text-secondary)]">
+                                  Target: {mission.target} {mission.unit}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0 sm:ml-4">
+                                <button
+                                  onClick={() => { setEditingMissionId(mission.id); setEditingMission({ ...mission }); }}
+                                  className="p-2 text-[var(--accent)] sm:opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
+                                  title="Edit"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                </button>
+                                <button
+                                  onClick={() => { if (confirm("Delete this mission?")) deleteMission(mission.id); }}
+                                  className="p-2 text-red-500 sm:opacity-0 group-hover:opacity-100 transition-all hover:scale-110"
+                                  title="Delete"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-[var(--card-bg)]/80 backdrop-blur-2xl p-6 rounded-3xl border border-[var(--accent)]/40 shadow-xl h-fit lg:sticky lg:top-12">
+                <h3 className="text-lg font-black mb-6 uppercase tracking-tight text-[var(--accent)]">Add Daily Mission</h3>
+                <form onSubmit={handleAddMission} className="space-y-4">
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Title</label>
+                    <input
+                      type="text"
+                      value={missionDraft.title}
+                      onChange={(e) => setMissionDraft((prev) => ({ ...prev, title: e.target.value }))}
+                      className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Description</label>
+                    <textarea
+                      rows={4}
+                      value={missionDraft.description}
+                      onChange={(e) => setMissionDraft((prev) => ({ ...prev, description: e.target.value }))}
+                      className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all resize-none"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Type</label>
+                      <select
+                        value={missionDraft.type}
+                        onChange={(e) => setMissionDraft((prev) => applyMissionTypeDefaults(e.target.value, prev))}
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                      >
+                        {MISSION_TYPE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Target</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={missionDraft.target}
+                        onChange={(e) => setMissionDraft((prev) => ({ ...prev, target: Number(e.target.value) }))}
+                        className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Unit</label>
+                    <input
+                      type="text"
+                      value={missionDraft.unit}
+                      onChange={(e) => setMissionDraft((prev) => ({ ...prev, unit: e.target.value }))}
+                      className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all"
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label className="text-[10px] font-black uppercase text-[var(--text-secondary)] flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={missionDraft.active}
+                        onChange={(e) => setMissionDraft((prev) => ({ ...prev, active: e.target.checked }))}
+                        className="w-4 h-4 accent-[var(--accent)]"
+                      />
+                      Active
+                    </label>
+                    <label className="text-[10px] font-black uppercase text-[var(--text-secondary)] flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={missionDraft.autoCheck}
+                        onChange={(e) => setMissionDraft((prev) => ({ ...prev, autoCheck: e.target.checked }))}
+                        className="w-4 h-4 accent-[var(--accent)]"
+                      />
+                      Auto-verified
+                    </label>
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full bg-[var(--accent)] text-black dark:text-black font-black py-3 rounded-xl text-xs hover:scale-[1.02] active:scale-[0.98] transition-all uppercase tracking-widest shadow-lg shadow-[var(--accent)]/20"
+                  >
+                    Add Mission
+                  </button>
+                </form>
+              </div>
+            </div>
+          </section>
+        )}
         {activeTab === "updates" && (
           <section className="animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-6 sm:mb-8">
@@ -2652,23 +3179,39 @@ function AdminPanel() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={() => {
-                      if (!dailyUpdateDraft.message.trim()) {
-                        toast.show("Please enter an update message before publishing.", "error");
-                        return;
-                      }
-                      addUpdate({
-                        ...dailyUpdateDraft,
-                        imageUrl: dailyUpdateDraft.uploadedImageData || dailyUpdateDraft.imageUrl,
-                      });
-                      setDailyUpdateDraft({ title: "", message: "", imageUrl: "", quote: "", uploadedImageData: "", uploadedImageName: "" });
-                      toast.show("Daily update added.", "success");
-                    }}
-                    className="w-full sm:w-auto bg-[var(--accent)] text-black dark:text-black font-black px-4 sm:px-8 py-3 rounded-xl shadow-lg shadow-[var(--accent)]/20 hover:scale-[1.05] active:scale-95 transition-all text-[11px] sm:text-xs tracking-widest uppercase"
-                  >
-                    Add Update
-                  </button>
+                    <button
+                      onClick={() => {
+                        if (!dailyUpdateDraft.message.trim()) {
+                          toast.show("Please enter an update message before publishing.", "error");
+                          return;
+                        }
+                        const finalImage = dailyUpdateDraft.uploadedImageData || dailyUpdateDraft.imageUrl;
+                        if (editingUpdateId) {
+                          updateUpdate(editingUpdateId, { ...dailyUpdateDraft, imageUrl: finalImage });
+                          setEditingUpdateId(null);
+                          toast.show("Daily update saved.", "success");
+                        } else {
+                          addUpdate({ ...dailyUpdateDraft, imageUrl: finalImage });
+                          toast.show("Daily update added.", "success");
+                        }
+                        setDailyUpdateDraft({ title: "", message: "", imageUrl: "", quote: "", uploadedImageData: "", uploadedImageName: "" });
+                      }}
+                      className="w-full sm:w-auto bg-[var(--accent)] text-black dark:text-black font-black px-4 sm:px-8 py-3 rounded-xl shadow-lg shadow-[var(--accent)]/20 hover:scale-[1.05] active:scale-95 transition-all text-[11px] sm:text-xs tracking-widest uppercase"
+                    >
+                      {editingUpdateId ? "Save Update" : "Add Update"}
+                    </button>
+
+                    {editingUpdateId && (
+                      <button
+                        onClick={() => {
+                          setEditingUpdateId(null);
+                          setDailyUpdateDraft({ title: "", message: "", imageUrl: "", quote: "", uploadedImageData: "", uploadedImageName: "" });
+                        }}
+                        className="w-full sm:w-auto bg-[var(--bg-primary)]/60 text-[var(--text-primary)] border border-[var(--accent)]/20 font-black px-4 sm:px-8 py-3 rounded-xl hover:bg-[var(--accent)]/10 transition-all text-[11px] sm:text-xs tracking-widest uppercase"
+                      >
+                        Cancel Edit
+                      </button>
+                    )}
 
                   <button
                     onClick={() => {
@@ -2699,23 +3242,44 @@ function AdminPanel() {
                               {item.message}
                             </p>
                           </div>
-                          <div className="shrink-0 flex items-center gap-2 self-end sm:self-auto">
-                            <button
-                              onClick={() => setPreviewUpdateId((prev) => (prev === item.id ? null : item.id))}
-                              className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent)] hover:text-black transition-all"
-                            >
-                              {previewUpdateId === item.id ? "Hide" : "Preview"}
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (!confirm("Delete this update?")) return;
-                                deleteUpdate(item.id);
-                                if (previewUpdateId === item.id) setPreviewUpdateId(null);
-                                toast.show("Update deleted.", "info");
-                              }}
-                              className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
-                            >
-                              Delete
+                            <div className="shrink-0 flex items-center gap-2 self-end sm:self-auto">
+                              <button
+                                onClick={() => {
+                                  setEditingUpdateId(item.id);
+                                  setDailyUpdateDraft({
+                                    title: item.title || "",
+                                    message: item.message || "",
+                                    imageUrl: item.imageUrl || "",
+                                    quote: item.quote || "",
+                                    uploadedImageData: "",
+                                    uploadedImageName: "",
+                                  });
+                                  toast.show("Editing update. Make changes above and save.", "info");
+                                }}
+                                className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-[var(--bg-primary)]/60 text-[var(--text-primary)] border border-[var(--accent)]/20 text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent)]/10 transition-all"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => setPreviewUpdateId((prev) => (prev === item.id ? null : item.id))}
+                                className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent)] hover:text-black transition-all"
+                              >
+                                {previewUpdateId === item.id ? "Hide" : "Preview"}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (!confirm("Delete this update?")) return;
+                                  deleteUpdate(item.id);
+                                  if (previewUpdateId === item.id) setPreviewUpdateId(null);
+                                  if (editingUpdateId === item.id) {
+                                    setEditingUpdateId(null);
+                                    setDailyUpdateDraft({ title: "", message: "", imageUrl: "", quote: "", uploadedImageData: "", uploadedImageName: "" });
+                                  }
+                                  toast.show("Update deleted.", "info");
+                                }}
+                                className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-red-500/10 text-red-500 border border-red-500/20 text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
+                              >
+                                Delete
                             </button>
                           </div>
                         </div>
@@ -2778,6 +3342,7 @@ function AdminPanel() {
             liveBattles={liveBattles}
             timeline={events}
             galleryImages={galleryImages}
+            missions={missions}
             toast={toast}
           />
         )}
@@ -2919,8 +3484,8 @@ function ModManagerSection({ mods, toggleStatus, updateModDetails, resetMods, to
   );
 }
 
-function GlobalConfigSection({ regions, mods, battles, liveBattles, timeline, galleryImages, toast }) {
-  const config = JSON.stringify({ regions, mods, battles, liveBattles, timeline, galleryImages }, null, 2);
+function GlobalConfigSection({ regions, mods, battles, liveBattles, timeline, galleryImages, missions, toast }) {
+  const config = JSON.stringify({ regions, mods, battles, liveBattles, timeline, galleryImages, dailyMissions: missions }, null, 2);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(config);

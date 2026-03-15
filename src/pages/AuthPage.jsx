@@ -13,6 +13,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [signupCountry, setSignupCountry] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [otp, setOtp] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -44,6 +45,14 @@ function AuthPage() {
       inputRef.current.focus();
     }
   }, [mode]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref") || params.get("referral") || params.get("referralCode");
+    if (ref) {
+      setReferralCode(String(ref).trim());
+    }
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -90,10 +99,14 @@ function AuthPage() {
     setError("");
     try {
       const region = COUNTRY_REGION_MAP[signupCountry] || "Global";
+      const payload = { email, password, username: normalizedUsername, country: signupCountry, region };
+      if (referralCode.trim()) {
+        payload.referralCode = referralCode.trim();
+      }
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, username: normalizedUsername, country: signupCountry, region })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (res.ok) {
@@ -296,6 +309,15 @@ function AuthPage() {
                   <option key={c} value={c} className="bg-[var(--bg-secondary)]">{c}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <input
+                type="text"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value)}
+                placeholder="Referral code (optional)"
+                className="w-full px-5 py-4 rounded-2xl bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 focus:border-[var(--accent)] outline-none transition-colors text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/50 text-lg shadow-inner"
+              />
             </div>
             {error && <p className="text-red-400 text-sm mt-2 ml-1">{error}</p>}
             <button type="submit" disabled={loading} className="w-full px-5 py-4 rounded-2xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/80 transition-all font-bold tracking-wider text-lg shadow-lg shadow-[var(--accent)]/20 hover:-translate-y-1">

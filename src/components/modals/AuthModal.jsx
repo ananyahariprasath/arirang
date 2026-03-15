@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { COUNTRIES, COUNTRY_REGION_MAP } from "../../constants";
 
 const USERNAME_REGEX = /^[A-Za-z0-9_]+$/;
 const STRONG_PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
@@ -9,6 +10,8 @@ function AuthModal({ isOpen, onClose }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+  const [signupCountry, setSignupCountry] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [otp, setOtp] = useState("");
   const [resetToken, setResetToken] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -23,6 +26,15 @@ function AuthModal({ isOpen, onClose }) {
       inputRef.current.focus();
     }
   }, [isOpen, mode]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref") || params.get("referral") || params.get("referralCode");
+    if (ref) {
+      setReferralCode(String(ref).trim());
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -54,6 +66,10 @@ function AuthModal({ isOpen, onClose }) {
     e.preventDefault();
     setError("");
     const normalizedUsername = String(username || "").trim();
+    if (!signupCountry) {
+      setError("Please select a country.");
+      return;
+    }
     if (!USERNAME_REGEX.test(normalizedUsername)) {
       setError("Username can contain only letters, numbers, and underscore (_) with no spaces.");
       return;
@@ -64,10 +80,15 @@ function AuthModal({ isOpen, onClose }) {
     }
     setLoading(true);
     try {
+      const region = COUNTRY_REGION_MAP[signupCountry] || "Global";
+      const payload = { email, password, username: normalizedUsername, country: signupCountry, region };
+      if (referralCode.trim()) {
+        payload.referralCode = referralCode.trim();
+      }
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, username: normalizedUsername }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (res.ok) {
@@ -190,6 +211,28 @@ function AuthModal({ isOpen, onClose }) {
             </div>
             <div>
               <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" required className="w-full px-4 py-3 rounded-xl bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 focus:border-[var(--accent)] outline-none transition-colors text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/50" />
+            </div>
+            <div>
+              <select
+                value={signupCountry}
+                onChange={(e) => setSignupCountry(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 focus:border-[var(--accent)] outline-none transition-colors text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/50 appearance-none cursor-pointer"
+              >
+                <option value="" disabled className="bg-[var(--bg-secondary)]">Select Country</option>
+                {COUNTRIES.sort().map((c) => (
+                  <option key={c} value={c} className="bg-[var(--bg-secondary)]">{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <input
+                type="text"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value)}
+                placeholder="Referral code (optional)"
+                className="w-full px-4 py-3 rounded-xl bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 focus:border-[var(--accent)] outline-none transition-colors text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/50"
+              />
             </div>
             <p className="text-[10px] text-[var(--text-secondary)]/80 -mt-2">
               Min 8 chars, at least 1 uppercase, 1 number, and 1 symbol.

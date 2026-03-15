@@ -26,6 +26,15 @@ function IconTop({ className = "w-4 h-4" }) {
   );
 }
 
+function IconMissions({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" className={className} aria-hidden="true">
+      <path d="M9 2h6a2 2 0 0 1 2 2v2H7V4a2 2 0 0 1 2-2z" />
+      <path d="M7 6H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2" />
+    </svg>
+  );
+}
+
 function IconButton({ onClick, label, children, className = "" }) {
   return (
     <button
@@ -42,15 +51,23 @@ function IconButton({ onClick, label, children, className = "" }) {
   );
 }
 
-function VerticalTabs({ onToggleSection }) {
+function VerticalTabs({ onToggleSection, className = "" }) {
   return (
-    <div className="hidden sm:flex fixed right-1.5 md:right-2 lg:right-3 top-1/2 -translate-y-1/2 z-[120] flex-col gap-1.5 md:gap-2 lg:gap-2.5">
+    <div className={`hidden sm:flex fixed right-1.5 md:right-2 lg:right-3 top-1/2 -translate-y-1/2 z-[120] flex-col gap-1.5 md:gap-2 lg:gap-2.5 transition-all duration-300 ease-out ${className}`}>
       <IconButton
         onClick={() => onToggleSection("top-achievers")}
         label="Top 10"
         className="bg-[var(--card-bg)]/80 backdrop-blur-xl border-[var(--accent)]/30 hover:bg-[var(--accent)]/10"
       >
         <IconTop className="w-5 h-5" />
+      </IconButton>
+
+      <IconButton
+        onClick={() => onToggleSection("missions")}
+        label="Missions"
+        className="bg-[var(--card-bg)]/80 backdrop-blur-xl border-[var(--accent)]/30 hover:bg-[var(--accent)]/10"
+      >
+        <IconMissions className="w-5 h-5" />
       </IconButton>
 
       <IconButton

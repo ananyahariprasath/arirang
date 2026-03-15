@@ -100,6 +100,29 @@ export default function useDailyUpdates() {
     });
   };
 
+  const updateUpdate = (id, { title, message, imageUrl, quote }) => {
+    const now = new Date().toISOString();
+    setUpdates((prev) => {
+      const next = normalizeUpdates(
+        prev.map((item) =>
+          String(item.id) === String(id)
+            ? {
+              ...item,
+              title: String(title || "").trim(),
+              message: String(message || "").trim(),
+              imageUrl: String(imageUrl || "").trim(),
+              quote: String(quote || "").trim(),
+              updatedAt: now,
+            }
+            : item
+        )
+      );
+      localStorage.setItem("dailyUpdates", JSON.stringify(next));
+      void persistUpdates(next);
+      return next;
+    });
+  };
+
   const deleteUpdate = (id) => {
     setUpdates((prev) => {
       const next = normalizeUpdates(prev.filter((item) => String(item.id) !== String(id)));
@@ -115,5 +138,5 @@ export default function useDailyUpdates() {
     void persistUpdates([]);
   };
 
-  return { updates, latestUpdate: updates[0] || null, addUpdate, deleteUpdate, clearUpdates, loading };
+  return { updates, latestUpdate: updates[0] || null, addUpdate, updateUpdate, deleteUpdate, clearUpdates, loading };
 }

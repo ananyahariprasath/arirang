@@ -42,6 +42,15 @@ function TopAchieversDrawer({ onClose, isOpen }) {
         theme === "light" ? "bg-[#faf8ff]" : "bg-[var(--bg-primary)]"
       }`}
     >
+      <div className="flex justify-center mb-4">
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border ${theme === "light" ? "bg-indigo-500/10 border-indigo-500/20" : "bg-[var(--accent)]/5 border-[var(--accent)]/10"}`}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)]" aria-hidden="true">
+            <path d="M8 21h8" />
+            <path d="M12 17v4" />
+            <path d="M7 4h10v4a5 5 0 0 1-10 0z" />
+          </svg>
+        </div>
+      </div>
       <div className="flex justify-between items-center mb-6 sm:mb-8">
         <div>
           <h2 className="text-lg sm:text-xl font-black text-[var(--accent)] tracking-tight">Top 10 Achievers</h2>
