@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { useTheme } from "../../context/ThemeContext";
 import { useAuth } from "../../context/AuthContext";
+import { useToast } from "../../context/ToastContext";
 import HelpDeskModal from "../modals/HelpDeskModal";
 import ConfirmModal from "../modals/ConfirmModal";
 import HeaderLogo from "../branding/HeaderLogo";
+import useDailyMissions from "../../hooks/useDailyMissions";
+import DailyMissionsDrawer from "../ui/DailyMissionsDrawer";
 
 const TOPIC_ROOMS_UNREAD_KEY_PREFIX = "topic_rooms_unread_total_v1_";
 
@@ -118,14 +121,65 @@ function IconShare({ className = "w-4 h-4" }) {
   );
 }
 
+function IconClipboard({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <path d="M9 2h6a2 2 0 0 1 2 2v2H7V4a2 2 0 0 1 2-2z" />
+      <path d="M7 6H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2" />
+    </svg>
+  );
+}
+
+function IconTop({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" className={className} aria-hidden="true">
+      <path d="M8 21h8" />
+      <path d="M12 17v4" />
+      <path d="M7 4h10v4a5 5 0 0 1-10 0z" />
+    </svg>
+  );
+}
+
+function IconRecent({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" className={className} aria-hidden="true">
+      <path d="M12 8v5l3 3" />
+      <circle cx="12" cy="12" r="9" />
+    </svg>
+  );
+}
+
+function IconSupport({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" className={className} aria-hidden="true">
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2.5" />
+      <path d="M4.5 7l7.5 6 7.5-6" />
+    </svg>
+  );
+}
+
+function IconGift({ className = "w-4 h-4" }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden="true">
+      <rect x="3" y="8" width="18" height="13" rx="2" />
+      <path d="M12 8v13" />
+      <path d="M3 12h18" />
+      <path d="M7 5c0 1.7 2.2 3 5 3s5-1.3 5-3c0-1.1-1-2-2.3-2-1.6 0-2.7 1.2-2.7 2 0-0.8-1.1-2-2.7-2C8 3 7 3.9 7 5z" />
+    </svg>
+  );
+}
+
 
 function Header({ onToggleSection }) {
   const { toggleTheme, theme } = useTheme();
   const { user, token, logout, updateUser, openAuthModal } = useAuth();
+  const { missions, loading: missionsLoading } = useDailyMissions();
+  const toast = useToast();
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isProfilePicModalOpen, setIsProfilePicModalOpen] = useState(false);
+  const [isMissionsOpen, setIsMissionsOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isConfirmDisconnectOpen, setIsConfirmDisconnectOpen] = useState(false);
@@ -142,6 +196,17 @@ function Header({ onToggleSection }) {
   const [translateLoading, setTranslateLoading] = useState(true);
   const [isMobileTranslateOpen, setIsMobileTranslateOpen] = useState(false);
   const [topicRoomsUnread, setTopicRoomsUnread] = useState(0);
+  const [topicRoomsActiveCount, setTopicRoomsActiveCount] = useState(0);
+  const [completedMissions, setCompletedMissions] = useState({});
+  const [isLuckyDrawModalOpen, setIsLuckyDrawModalOpen] = useState(false);
+  const [luckyDrawEntry, setLuckyDrawEntry] = useState(null);
+  const [luckyDrawLoading, setLuckyDrawLoading] = useState(false);
+  const [luckyDrawSubmitting, setLuckyDrawSubmitting] = useState(false);
+  const [luckyDrawError, setLuckyDrawError] = useState("");
+  const [socialPlatform, setSocialPlatform] = useState("");
+  const [socialHandle, setSocialHandle] = useState("");
+  const [justCompletedMissionId, setJustCompletedMissionId] = useState(null);
+  const [referralVerifiedCount, setReferralVerifiedCount] = useState(0);
 
   const profileRef = useRef(null);
   const mobileMenuRef = useRef(null);
@@ -312,6 +377,17 @@ function Header({ onToggleSection }) {
   }, [isMenuOpen]);
 
   useEffect(() => {
+    const openMissions = () => setIsMissionsOpen(true);
+    window.addEventListener("open-daily-missions", openMissions);
+    const closeMissions = () => setIsMissionsOpen(false);
+    window.addEventListener("close-daily-missions", closeMissions);
+    return () => {
+      window.removeEventListener("open-daily-missions", openMissions);
+      window.removeEventListener("close-daily-missions", closeMissions);
+    };
+  }, []);
+
+  useEffect(() => {
     const identity = toIdentity(user?.username || user?.email || "");
     if (!identity) {
       setTopicRoomsUnread(0);
@@ -335,6 +411,120 @@ function Header({ onToggleSection }) {
     };
   }, [user?.username, user?.email]);
 
+  useEffect(() => {
+    let active = true;
+    const loadActiveRooms = async () => {
+      try {
+        const response = await fetch("/api/topic-rooms", { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        if (!active || !response.ok) return;
+        const now = Date.now();
+        const rooms = Array.isArray(data?.rooms) ? data.rooms : [];
+        const count = rooms.filter((room) => room.status === "active" && Number(room.expiresAt || 0) > now).length;
+        setTopicRoomsActiveCount(count);
+      } catch {
+        // Silent failure
+      }
+    };
+    loadActiveRooms();
+    const intervalId = setInterval(loadActiveRooms, 30000);
+    return () => {
+      active = false;
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const userKey = String(user?.id || user?.username || user?.email || "guest").toLowerCase();
+    const dateKey = new Date().toLocaleDateString("en-CA");
+    const storageKey = `daily_missions_done_v1_${userKey}_${dateKey}`;
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        setCompletedMissions(JSON.parse(saved) || {});
+      } catch {
+        setCompletedMissions({});
+      }
+    } else {
+      setCompletedMissions({});
+    }
+  }, [user?.id, user?.username, user?.email]);
+
+  const persistCompletedMissions = (next) => {
+    if (typeof window === "undefined") return;
+    const userKey = String(user?.id || user?.username || user?.email || "guest").toLowerCase();
+    const dateKey = new Date().toLocaleDateString("en-CA");
+    const storageKey = `daily_missions_done_v1_${userKey}_${dateKey}`;
+    localStorage.setItem(storageKey, JSON.stringify(next));
+  };
+
+  const referralCode = String(user?.referralCode || user?.username || "").trim();
+  const referralLink = referralCode && typeof window !== "undefined"
+    ? `${window.location.origin}/auth?ref=${encodeURIComponent(referralCode)}`
+    : "";
+  const LUCKY_DRAW_SOCIALS = ["instagram", "twitter", "facebook", "telegram", "discord", "weverse"];
+
+  useEffect(() => {
+    if (!isLuckyDrawModalOpen) return;
+    if (!token) {
+      setLuckyDrawEntry(null);
+      setLuckyDrawLoading(false);
+      return;
+    }
+    let active = true;
+    setLuckyDrawLoading(true);
+    setLuckyDrawError("");
+    fetch("/api/lucky-draw", { headers: { Authorization: `Bearer ${token}` } })
+      .then((res) => res.json().then((data) => ({ res, data })))
+      .then(({ res, data }) => {
+        if (!active) return;
+        if (!res.ok) {
+          throw new Error(data?.error || "Failed to load entry");
+        }
+        setLuckyDrawEntry(data?.entry || null);
+        if (data?.entry?.platform) setSocialPlatform(String(data.entry.platform));
+        if (data?.entry?.handle) setSocialHandle(String(data.entry.handle));
+      })
+      .catch((error) => {
+        if (!active) return;
+        setLuckyDrawError(error.message || "Failed to load entry");
+      })
+      .finally(() => {
+        if (active) setLuckyDrawLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [isLuckyDrawModalOpen, token]);
+
+  useEffect(() => {
+    if (!isMissionsOpen || !token) return;
+    let active = true;
+    fetch("/api/auth/referral-stats", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json().then((data) => ({ res, data })))
+      .then(({ res, data }) => {
+        if (!active || !res.ok) return;
+        const verified = Number(data?.totals?.verified || 0);
+        setReferralVerifiedCount(verified);
+        if (verified >= 5) {
+          const referralMission = missions.find((mission) => mission.type === "referral");
+          if (referralMission && !completedMissions[referralMission.id]) {
+            const next = { ...completedMissions, [referralMission.id]: true };
+            setCompletedMissions(next);
+            persistCompletedMissions(next);
+          }
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [isMissionsOpen, token, missions, completedMissions]);
+
   const filteredTranslateLanguages = availableTranslateLanguages.filter((lang) =>
     lang.label.toLowerCase().includes(translateSearch.trim().toLowerCase())
   );
@@ -350,6 +540,60 @@ function Header({ onToggleSection }) {
     document.cookie = `googtrans=${googTransValue};path=/`;
     document.cookie = `googtrans=${googTransValue};path=/;SameSite=Lax`;
     window.location.reload();
+  };
+
+  const handleLuckyDrawSubmit = async (e, visibleMissions) => {
+    e.preventDefault();
+    if (!token || !user?.id) {
+      openAuthModal?.();
+      toast.show("Please log in to submit your lucky draw entry.", "error");
+      return;
+    }
+    const allComplete = visibleMissions.length === 5
+      && visibleMissions.every((mission) => completedMissions[mission.id]);
+    if (!allComplete) {
+      toast.show("Complete all 5 missions to unlock the lucky draw entry.", "error");
+      return;
+    }
+    if (luckyDrawEntry) {
+      toast.show("Entry already submitted for today.", "info");
+      return;
+    }
+    const platform = String(socialPlatform || "").trim().toLowerCase();
+    const handle = String(socialHandle || "").trim();
+    if (!LUCKY_DRAW_SOCIALS.includes(platform)) {
+      toast.show("Select a valid social platform.", "error");
+      return;
+    }
+    if (!handle) {
+      toast.show("Please enter your social ID.", "error");
+      return;
+    }
+
+    setLuckyDrawSubmitting(true);
+    setLuckyDrawError("");
+    try {
+      const response = await fetch("/api/lucky-draw", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ platform, handle }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to submit entry");
+      }
+      setLuckyDrawEntry(data?.entry || { platform, handle });
+      setIsLuckyDrawModalOpen(false);
+      toast.show("Lucky draw entry submitted!", "success");
+    } catch (error) {
+      setLuckyDrawError(error.message || "Failed to submit entry");
+      toast.show(error.message || "Failed to submit entry", "error");
+    } finally {
+      setLuckyDrawSubmitting(false);
+    }
   };
 
   // Generate initials for avatar fallback
@@ -456,9 +700,20 @@ function Header({ onToggleSection }) {
                   <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black leading-none flex items-center justify-center border border-white/20">
                     {topicRoomsUnread > 99 ? "99+" : topicRoomsUnread}
                   </span>
+                ) : topicRoomsActiveCount > 0 ? (
+                  <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border border-[var(--bg-primary)]/80" />
                 ) : null}
               </button>
             )}
+
+            <button
+              onClick={() => setIsLuckyDrawModalOpen(true)}
+              className="relative w-9 h-9 rounded-full bg-[var(--card-bg)]/50 backdrop-blur-xl border border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 hover:border-[var(--accent)] transition-all duration-300 flex items-center justify-center"
+              aria-label="Lucky Draw"
+              title="Lucky Draw"
+            >
+              <IconGift className="w-4 h-4" />
+            </button>
 
             <div id="onboarding-header-translate" className="relative" ref={translateRef}>
               <button
@@ -743,19 +998,19 @@ function Header({ onToggleSection }) {
                     ) : null}
                   </div>
 
-                  {/* Mobile Recent Battles Button */}
+                  {/* Mobile Missions Button */}
                   <button
                     onClick={() => {
-                      if (onToggleSection) onToggleSection('recent-battles');
+                      if (onToggleSection) onToggleSection("missions");
                       setIsMenuOpen(false);
                     }}
                     className="w-full px-5 py-3 text-[10px] font-black rounded-xl
                      bg-[var(--card-bg)]/60 
                      border border-[var(--accent)]/40
                      hover:bg-[var(--accent)]/10
-                     transition-all duration-300 tracking-widest uppercase"
+                     transition-all duration-300 tracking-widest uppercase flex items-center justify-center gap-2"
                   >
-                    Recent Battles
+                    <IconClipboard /> Missions
                   </button>
 
                   {/* Mobile Top Achievers Button */}
@@ -768,24 +1023,9 @@ function Header({ onToggleSection }) {
                      bg-[var(--card-bg)]/60 
                      border border-[var(--accent)]/40
                      hover:bg-[var(--accent)]/10
-                     transition-all duration-300 tracking-widest uppercase"
+                     transition-all duration-300 tracking-widest uppercase flex items-center justify-center gap-2"
                   >
-                    Top 10 Achievers
-                  </button>
-
-                  {/* Mobile Support Button */}
-                  <button
-                    onClick={() => {
-                      if (onToggleSection) onToggleSection('contact');
-                      setIsMenuOpen(false);
-                    }}
-                    className="w-full px-5 py-3 text-[10px] font-black rounded-xl
-                     bg-[var(--card-bg)]/60 
-                     border border-[var(--accent)]/40
-                     hover:bg-[var(--accent)]/10
-                     transition-all duration-300 tracking-widest uppercase"
-                  >
-                    Support
+                    <IconTop /> Top 10 Achievers
                   </button>
 
                   {onToggleSection && (
@@ -808,6 +1048,49 @@ function Header({ onToggleSection }) {
                       ) : null}
                     </button>
                   )}
+
+                  {/* Mobile Recent Battles Button */}
+                  <button
+                    onClick={() => {
+                      if (onToggleSection) onToggleSection('recent-battles');
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full px-5 py-3 text-[10px] font-black rounded-xl
+                     bg-[var(--card-bg)]/60 
+                     border border-[var(--accent)]/40
+                     hover:bg-[var(--accent)]/10
+                     transition-all duration-300 tracking-widest uppercase flex items-center justify-center gap-2"
+                  >
+                    <IconRecent /> Recent Battles
+                  </button>
+
+                  {/* Mobile Support Button */}
+                  <button
+                    onClick={() => {
+                      if (onToggleSection) onToggleSection('contact');
+                      setIsMenuOpen(false);
+                    }}
+                    className="w-full px-5 py-3 text-[10px] font-black rounded-xl
+                     bg-[var(--card-bg)]/60 
+                     border border-[var(--accent)]/40
+                     hover:bg-[var(--accent)]/10
+                     transition-all duration-300 tracking-widest uppercase flex items-center justify-center gap-2"
+                  >
+                    <IconSupport /> Support
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      setIsLuckyDrawModalOpen(true);
+                    }}
+                    className="w-full px-5 py-3 text-[10px] font-black rounded-xl
+                     bg-[var(--card-bg)]/60 
+                     border border-[var(--accent)]/40
+                     hover:bg-[var(--accent)]/10
+                     transition-all duration-300 tracking-widest uppercase flex items-center justify-center gap-2"
+                  >
+                    <IconGift /> Lucky Draw
+                  </button>
 
                   {/* Mobile Profile Actions (if logged in) */}
                   {user && (
@@ -897,6 +1180,180 @@ function Header({ onToggleSection }) {
           </div>
         </div>
       </header>
+
+      <DailyMissionsDrawer
+        isOpen={isMissionsOpen}
+        onClose={() => {
+          setIsMissionsOpen(false);
+          window.dispatchEvent(new Event("close-daily-missions"));
+        }}
+        missions={missions}
+        missionsLoading={missionsLoading}
+        completedMissions={completedMissions}
+        onCompleteMission={(missionId) => {
+          const mission = missions.find((item) => item.id === missionId);
+          if (mission?.type === "referral") {
+            toast.show("Referral mission auto-completes after 5 friends join.", "info");
+            return;
+          }
+          const next = { ...completedMissions, [missionId]: true };
+          setCompletedMissions(next);
+          persistCompletedMissions(next);
+        }}
+        referralVerifiedCount={referralVerifiedCount}
+        referralLink={referralLink}
+      />
+
+      {isLuckyDrawModalOpen && (
+        <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/60 backdrop-blur-sm text-[var(--text-primary)]">
+          <div className="bg-[var(--card-bg)] border border-[var(--accent)]/40 p-6 rounded-2xl shadow-2xl w-[92%] max-w-lg relative animate-in fade-in zoom-in duration-200">
+            <button
+              onClick={() => setIsLuckyDrawModalOpen(false)}
+              className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              aria-label="Close lucky draw"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-2xl bg-[var(--accent)]/10 flex items-center justify-center">
+                <IconGift className="w-5 h-5 text-[var(--accent)]" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black text-[var(--accent)]">Lucky Draw</h2>
+                <p className="text-[10px] uppercase tracking-widest text-[var(--text-secondary)]">
+                  Complete all 5 missions to enter
+                </p>
+              </div>
+            </div>
+
+            {luckyDrawLoading ? (
+              <p className="text-sm font-semibold text-[var(--text-secondary)]">Loading entry...</p>
+            ) : (
+              (() => {
+                const visibleMissions = missions.filter((mission) => mission.active !== false);
+                const completedCount = visibleMissions.filter((mission) => completedMissions[mission.id]).length;
+                const allComplete = visibleMissions.length === 5
+                  && visibleMissions.every((mission) => completedMissions[mission.id]);
+                return (
+                  <>
+                    <div className="rounded-xl border border-[var(--accent)]/15 bg-[var(--bg-primary)]/30 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)] mb-3">
+                      Progress: {completedCount}/{visibleMissions.length || 5}
+                    </div>
+
+                    <div className="space-y-2 max-h-[38vh] overflow-y-auto no-scrollbar pr-1">
+                      {visibleMissions.map((mission) => (
+                        <div key={mission.id} className="rounded-xl border border-[var(--accent)]/15 bg-[var(--bg-primary)]/40 p-3">
+                          <div className="flex items-start justify-between gap-3 mb-1">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="text-sm font-black text-[var(--accent)] truncate">{mission.title}</p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              aria-label="Mark complete"
+                              disabled={Boolean(completedMissions[mission.id])}
+                              onClick={() => {
+                                const next = { ...completedMissions, [mission.id]: true };
+                                setCompletedMissions(next);
+                                persistCompletedMissions(next);
+                                setJustCompletedMissionId(mission.id);
+                                setTimeout(() => setJustCompletedMissionId((prev) => (prev === mission.id ? null : prev)), 500);
+                              }}
+                              className={`shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-xl transition-all ${
+                                completedMissions[mission.id]
+                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 cursor-not-allowed"
+                                  : "bg-[var(--accent)] text-black hover:brightness-110 border border-[var(--accent)]/40"
+                              } ${justCompletedMissionId === mission.id ? "scale-110 ring-2 ring-emerald-400/60" : ""}`}
+                            >
+                              <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden="true">
+                                <path d="M4 10l4 4 8-8" />
+                              </svg>
+                            </button>
+                          </div>
+                          <p className="text-xs font-semibold text-[var(--text-primary)]/80">{mission.description}</p>
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <p className="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] font-black">
+                              Target: {mission.target} {mission.unit}
+                            </p>
+                          </div>
+                          {mission.type === "referral" && referralLink ? (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  await navigator.clipboard.writeText(referralLink);
+                                  toast.show("Referral link copied!", "success");
+                                } catch {
+                                  toast.show("Copy failed. Please copy manually.", "error");
+                                }
+                              }}
+                              className="mt-2 px-3 py-1.5 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 text-[9px] font-black uppercase tracking-widest hover:bg-[var(--accent)] hover:text-black transition-all flex items-center gap-2"
+                            >
+                              <IconClipboard className="w-3.5 h-3.5" /> Copy Referral
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+
+                    {allComplete ? (
+                      <form onSubmit={(e) => handleLuckyDrawSubmit(e, visibleMissions)} className="mt-4 rounded-xl border border-[var(--accent)]/20 bg-[var(--bg-primary)]/40 p-3">
+                        <p className="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] font-black mb-3">
+                          Submit your social contact
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr_auto] gap-2">
+                          <select
+                            value={socialPlatform}
+                            onChange={(e) => setSocialPlatform(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl bg-[var(--bg-primary)]/60 border border-[var(--accent)]/30 text-xs font-semibold focus:outline-none focus:border-[var(--accent)] appearance-none"
+                          >
+                            <option value="">Select Platform</option>
+                            {LUCKY_DRAW_SOCIALS.map((platform) => (
+                              <option key={platform} value={platform}>
+                                {platform}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            value={socialHandle}
+                            onChange={(e) => setSocialHandle(e.target.value)}
+                            placeholder="Your ID/handle"
+                            className="w-full px-3 py-2 rounded-xl bg-[var(--bg-primary)]/60 border border-[var(--accent)]/30 text-xs font-semibold focus:outline-none focus:border-[var(--accent)]"
+                          />
+                          <button
+                            type="submit"
+                            disabled={luckyDrawSubmitting || Boolean(luckyDrawEntry)}
+                            className="px-3 py-2 rounded-xl bg-[var(--accent)] text-black font-black uppercase tracking-widest text-[10px] hover:brightness-110 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {luckyDrawEntry ? "Submitted" : luckyDrawSubmitting ? "Submitting..." : "Submit"}
+                          </button>
+                        </div>
+                        {luckyDrawEntry && (
+                          <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-emerald-400">
+                            Entry already submitted for today.
+                          </p>
+                        )}
+                        {luckyDrawError && (
+                          <p className="mt-2 text-[10px] font-black text-red-400">{luckyDrawError}</p>
+                        )}
+                      </form>
+                    ) : (
+                      <p className="mt-3 text-xs font-semibold text-[var(--text-secondary)]">
+                        Finish all missions to unlock the entry form.
+                      </p>
+                    )}
+                  </>
+                );
+              })()
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Add ProfilePic Modal inline for now or create a separate component. Doing inline for simplicity using existing modal styles. */}
       {isProfilePicModalOpen && (

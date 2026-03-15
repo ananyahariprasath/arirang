@@ -37,6 +37,20 @@ function sanitizeRooms(input) {
             label: String(p?.label || "").trim(),
           }))
         : [],
+      userProfiles:
+        room?.userProfiles && typeof room.userProfiles === "object"
+          ? Object.fromEntries(
+              Object.entries(room.userProfiles)
+                .map(([id, profile]) => [
+                  String(id || "").trim().toLowerCase(),
+                  {
+                    label: String(profile?.label || "").trim(),
+                    avatar: String(profile?.avatar || "").trim(),
+                  },
+                ])
+                .filter(([id]) => id)
+            )
+          : {},
       closedBy: String(room?.closedBy || "").trim(),
       closedAt: Number(room?.closedAt || 0) || 0,
       messages: Array.isArray(room?.messages)

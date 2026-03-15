@@ -1,6 +1,6 @@
 import { getDb } from "../lib/mongodb.js";
 
-const ALLOWED_KEYS = new Set(["timeline", "regions", "mods", "galleryImages", "dailyUpdates"]);
+const ALLOWED_KEYS = new Set(["timeline", "regions", "mods", "galleryImages", "dailyUpdates", "dailyMissions"]);
 
 function setCors(res) {
   res.setHeader("Access-Control-Allow-Credentials", "true");

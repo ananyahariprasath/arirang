@@ -602,7 +602,7 @@ export const COUNTRIES = [
 
 export const FOCUS_PLAYLISTS = {
   spotify: [
-    { name: "Playlist 1", url: "" },
+    { name: "Playlist 1", url: "https://open.spotify.com/prerelease/1DcxHW214MCDxXju71RbvX?si=86b46ae8ee7743d4" },
     { name: "Playlist 2", url: "" },
     { name: "Playlist 3", url: "" },
     { name: "Playlist 4", url: "" },
@@ -646,6 +646,64 @@ export const FOCUS_PLAYLISTS = {
     { name: "Playlist 20", url: "" }
   ]
 };
+
+export const DEFAULT_DAILY_MISSIONS = [
+  {
+    id: "mission-1",
+    title: "Stream the title track",
+    description: "Stream the title track on your preferred platform.",
+    type: "stream",
+    target: 20,
+    unit: "plays",
+    autoCheck: true,
+    active: true,
+    order: 1
+  },
+  {
+    id: "mission-2",
+    title: "Stream the full album",
+    description: "Listen to the full album at least once.",
+    type: "stream",
+    target: 1,
+    unit: "full listens",
+    autoCheck: true,
+    active: true,
+    order: 2
+  },
+  {
+    id: "mission-3",
+    title: "Share the comeback",
+    description: "Share the comeback link on any social platform.",
+    type: "share",
+    target: 1,
+    unit: "shares",
+    autoCheck: true,
+    active: true,
+    order: 3
+  },
+  {
+    id: "mission-4",
+    title: "Join the fan action",
+    description: "Complete today’s fan action or challenge.",
+    type: "engagement",
+    target: 1,
+    unit: "actions",
+    autoCheck: true,
+    active: true,
+    order: 4
+  },
+  {
+    id: "mission-5",
+    title: "Refer 5 friends",
+    description: "Bring 5 verified signups using your referral link.",
+    type: "referral",
+    target: 5,
+    unit: "verified signups",
+    autoCheck: true,
+    active: true,
+    order: 5
+  }
+];
 
 export const INITIAL_REGIONS = [
   {

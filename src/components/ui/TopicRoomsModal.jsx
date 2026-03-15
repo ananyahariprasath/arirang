@@ -23,13 +23,25 @@ function formatTimeLeft(ms) {
 function UserNameWithBadge({ label, isAdmin }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span>{label}</span>
-      {isAdmin ? (
-        <span className="px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border border-amber-300/40 text-amber-200 bg-amber-500/10">
-          Admin
-        </span>
-      ) : null}
+      <span className={isAdmin ? "text-[var(--accent)]" : "text-pink-300"}>{label}</span>
     </span>
+  );
+}
+
+function getInitials(label) {
+  const value = String(label || "").trim();
+  if (!value) return "?";
+  return value.slice(0, 1).toUpperCase();
+}
+
+function Avatar({ label, src, className = "" }) {
+  if (src) {
+    return <img src={src} alt={label || "avatar"} className={`w-8 h-8 rounded-full object-cover border border-[var(--accent)]/30 ${className}`} />;
+  }
+  return (
+    <div className={`w-8 h-8 rounded-full bg-[var(--accent)]/20 border border-[var(--accent)]/30 text-[var(--accent)] flex items-center justify-center text-xs font-black ${className}`}>
+      {getInitials(label)}
+    </div>
   );
 }
 
@@ -60,18 +72,21 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
   const [messageImageData, setMessageImageData] = useState("");
   const [messageImageName, setMessageImageName] = useState("");
   const [replyToMessage, setReplyToMessage] = useState(null);
+  const [adminExpiryAt, setAdminExpiryAt] = useState("");
   const [exitedRoomIds, setExitedRoomIds] = useState([]);
   const [roomReadMap, setRoomReadMap] = useState({});
   const [storageReady, setStorageReady] = useState(false);
   const [exitConfirmRoomId, setExitConfirmRoomId] = useState("");
   const [transferTargetId, setTransferTargetId] = useState("");
   const messagesContainerRef = useRef(null);
+  const adminExpiryInputRef = useRef(null);
   const isApplyingRemoteRef = useRef(false);
   const hasLoadedRemoteRef = useRef(false);
 
   const currentUserIdentity = toIdentity(user?.username || user?.email || "");
   const currentUserLabel = String(user?.username || user?.email || "you");
   const isAdmin = String(user?.role || "").toLowerCase() === "admin";
+  const currentUserAvatar = String(user?.profilePicture || "");
   const currentUserRoomIdentity = currentUserIdentity || toIdentity(currentUserLabel);
   const exitedStorageKey = `${TOPIC_ROOMS_EXITED_KEY_PREFIX}${currentUserRoomIdentity || "guest"}`;
   const readsStorageKey = `${TOPIC_ROOMS_READS_KEY_PREFIX}${currentUserRoomIdentity || "guest"}`;
@@ -134,6 +149,7 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
     }, 15000);
     return () => clearInterval(intervalId);
   }, [isOpen]);
+
 
   useEffect(() => {
     if (!hasLoadedRemoteRef.current) return;
@@ -289,7 +305,25 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
     setMessageImageData("");
     setMessageImageName("");
     setReplyToMessage(null);
+    setAdminExpiryAt("");
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!selectedRoomId || !currentUserRoomIdentity) return;
+    updateRoom(selectedRoomId, (prev) => {
+      const existing = prev.userProfiles?.[currentUserRoomIdentity];
+      const nextLabel = currentUserLabel;
+      const nextAvatar = currentUserAvatar;
+      if (existing?.label === nextLabel && existing?.avatar === nextAvatar) return prev;
+      return {
+        ...prev,
+        userProfiles: {
+          ...(prev.userProfiles || {}),
+          [currentUserRoomIdentity]: { label: nextLabel, avatar: nextAvatar },
+        },
+      };
+    });
+  }, [selectedRoomId, currentUserRoomIdentity, currentUserLabel, currentUserAvatar]);
 
   const updateRoom = (roomId, updater) => {
     setRooms((prev) => prev.map((room) => (room.id === roomId ? updater(room) : room)));
@@ -312,8 +346,8 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
 
     const duration = Number.parseInt(String(draft.durationMins || config.defaultDurationMins), 10);
     const boundedDuration = isAdmin
-      ? (Number.isFinite(duration) ? Math.max(5, Math.min(120, duration)) : Math.min(120, config.defaultDurationMins))
-      : Math.min(120, config.defaultDurationMins);
+      ? (Number.isFinite(duration) ? Math.max(5, duration) : Math.max(5, config.defaultDurationMins))
+      : 120;
     const creator = currentUserLabel;
 
     const newRoom = {
@@ -329,6 +363,9 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
       expiresAt: Date.now() + (boundedDuration * 60 * 1000),
       status: "active",
       participants: [{ id: currentUserRoomIdentity, label: creator }],
+      userProfiles: {
+        [currentUserRoomIdentity]: { label: creator, avatar: currentUserAvatar },
+      },
       closedBy: "",
       closedAt: 0,
       messages: [],
@@ -341,7 +378,7 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
       ...prev,
       title: "",
       description: "",
-      durationMins: config.defaultDurationMins,
+      durationMins: isAdmin ? config.defaultDurationMins : 120,
     }));
     setDraftCoverImageData("");
     setDraftCoverImageName("");
@@ -362,6 +399,10 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
       updateRoom(roomId, (prev) => ({
         ...prev,
         participants: [...prev.participants, { id: currentUserRoomIdentity, label: currentUserLabel }],
+        userProfiles: {
+          ...(prev.userProfiles || {}),
+          [currentUserRoomIdentity]: { label: currentUserLabel, avatar: currentUserAvatar },
+        },
       }));
     }
     setExitedRoomIds((prev) => prev.filter((id) => id !== roomId));
@@ -520,6 +561,7 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
           id: `msg-${Date.now()}`,
           author: currentUserLabel,
           authorIdentity: currentUserRoomIdentity,
+          authorAvatar: currentUserAvatar,
           text,
           image: messageImageData || "",
           imageName: messageImageName || "",
@@ -532,6 +574,10 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
           replyToImage: String(replyToMessage?.image || ""),
         },
       ],
+      userProfiles: {
+        ...(prev.userProfiles || {}),
+        [currentUserRoomIdentity]: { label: currentUserLabel, avatar: currentUserAvatar },
+      },
     }));
     setMessageDraft("");
     setMessageImageData("");
@@ -834,6 +880,69 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
                     <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${selectedRoom.status === "active" ? "border-amber-300/40 text-amber-200 bg-amber-500/10" : "border-red-300/40 text-red-200 bg-red-500/10"}`}>
                       {selectedRoom.status === "active" ? `Expires in ${formatTimeLeft(selectedRoom.expiresAt - nowMs)}` : selectedRoom.status}
                     </span>
+                    {isAdmin ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (adminExpiryInputRef.current?.showPicker) {
+                              adminExpiryInputRef.current.showPicker();
+                            } else {
+                              adminExpiryInputRef.current?.focus();
+                            }
+                          }}
+                          className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg border border-[var(--accent)]/30 text-[var(--accent)] text-[9px] font-black uppercase tracking-widest hover:bg-[var(--accent)]/10 transition-all"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" aria-hidden="true">
+                            <path d="M7 3v3M17 3v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                            <rect x="4" y="6" width="16" height="14" rx="2" stroke="currentColor" strokeWidth="2" />
+                            <path d="M4 10h16" stroke="currentColor" strokeWidth="2" />
+                          </svg>
+                          Set Expiry
+                        </button>
+                        <input
+                          ref={adminExpiryInputRef}
+                          type="datetime-local"
+                          value={adminExpiryAt}
+                          onChange={(e) => setAdminExpiryAt(e.target.value)}
+                          className="sr-only"
+                        />
+                        {adminExpiryAt ? (
+                          <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-secondary)]">
+                            {new Date(adminExpiryAt).toLocaleString()}
+                          </span>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!adminExpiryAt) {
+                              toast.show("Select a new expiry time.", "error");
+                              return;
+                            }
+                            const nextTime = new Date(adminExpiryAt);
+                            if (Number.isNaN(nextTime.getTime())) {
+                              toast.show("Invalid date/time.", "error");
+                              return;
+                            }
+                            if (nextTime.getTime() <= Date.now()) {
+                              toast.show("Expiry time must be in the future.", "error");
+                              return;
+                            }
+                            updateRoom(selectedRoom.id, (prev) => ({
+                              ...prev,
+                              expiresAt: nextTime.getTime(),
+                              status: "active",
+                              expiredAt: 0,
+                            }));
+                            setAdminExpiryAt("");
+                            toast.show("Room expiry updated.", "success");
+                          }}
+                          className="px-2.5 py-1 rounded-lg border border-[var(--accent)]/30 text-[var(--accent)] text-[9px] font-black uppercase tracking-widest hover:bg-[var(--accent)]/10 transition-all"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => openExitPrompt(selectedRoom.id)}
@@ -888,35 +997,45 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
                           </div>
                         </div>
                       ) : (
-                        selectedRoom.messages.map((message) => (
-                          <div key={message.id} className={`flex ${toIdentity(message.authorIdentity) === currentUserRoomIdentity ? "justify-end" : "justify-start"}`}>
-                            <div className={`max-w-[94%] sm:max-w-[86%] rounded-2xl border p-3 ${toIdentity(message.authorIdentity) === currentUserRoomIdentity ? "border-[var(--accent)]/35 bg-[var(--accent)]/10" : "border-[var(--accent)]/15 bg-[var(--bg-primary)]/40"}`}>
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                  <p className="text-[10px] uppercase tracking-widest font-black text-[var(--accent)]">
-                                    <UserNameWithBadge label={message.author} isAdmin={String(message.authorRole || "").toLowerCase() === "admin"} />
-                                  </p>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReplyMessage(message)}
-                                    title="Reply"
-                                    aria-label="Reply"
-                                    className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-[var(--accent)]/35 text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all"
-                                  >
-                                    <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5" aria-hidden="true">
-                                      <path d="M10 8L6 12L10 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                      <path d="M6 12H14C17.3 12 20 14.7 20 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                                    </svg>
-                                  </button>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {toIdentity(message.authorIdentity) !== currentUserRoomIdentity ? (
-                                    <button type="button" onClick={() => void handleReportUser(selectedRoom, message)} disabled={reportingMessageId === String(message.id)} className="px-2.5 py-1 rounded-full border border-red-400/40 text-red-300 text-[9px] font-black uppercase tracking-widest hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                                      {reportingMessageId === String(message.id) ? "Reporting..." : "Report User"}
-                                    </button>
-                                  ) : null}
-                                </div>
-                              </div>
+                        selectedRoom.messages.map((message) => {
+                          const isSelf = toIdentity(message.authorIdentity) === currentUserRoomIdentity;
+                          const authorId = toIdentity(message.authorIdentity);
+                          const authorAvatar = selectedRoom?.userProfiles?.[authorId]?.avatar || (isSelf ? currentUserAvatar : "");
+                          return (
+                            <div key={message.id} className={`flex ${isSelf ? "justify-end" : "justify-start"}`}>
+                              <div className={`flex items-end gap-2 ${isSelf ? "flex-row-reverse" : "flex-row"}`}>
+                                <Avatar
+                                  label={message.author}
+                                  src={authorAvatar}
+                                  className="w-7 h-7"
+                                />
+                                <div className={`max-w-[94%] sm:max-w-[86%] rounded-2xl border p-3 ${isSelf ? "border-[var(--accent)]/35 bg-[var(--accent)]/10" : "border-[var(--accent)]/15 bg-[var(--bg-primary)]/40"}`}>
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-[10px] tracking-widest font-black text-[var(--accent)]">
+                                        <UserNameWithBadge label={message.author} isAdmin={String(message.authorRole || "").toLowerCase() === "admin"} />
+                                      </p>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleReplyMessage(message)}
+                                        title="Reply"
+                                        aria-label="Reply"
+                                        className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-[var(--accent)]/35 text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all"
+                                      >
+                                        <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5" aria-hidden="true">
+                                          <path d="M10 8L6 12L10 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                          <path d="M6 12H14C17.3 12 20 14.7 20 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {!isSelf ? (
+                                        <button type="button" onClick={() => void handleReportUser(selectedRoom, message)} disabled={reportingMessageId === String(message.id)} className="px-2.5 py-1 rounded-full border border-red-400/40 text-red-300 text-[9px] font-black uppercase tracking-widest hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                                          {reportingMessageId === String(message.id) ? "Reporting..." : "Report User"}
+                                        </button>
+                                      ) : null}
+                                    </div>
+                                  </div>
                               {(message.replyToAuthor || message.replyToText || message.replyToImage) ? (
                                 <div className="mt-1 rounded-lg border border-[var(--accent)]/20 bg-[var(--bg-primary)]/35 px-2.5 py-1.5">
                                   <p className="text-[9px] font-black uppercase tracking-widest text-[var(--text-secondary)]">Reply to {message.replyToAuthor || "user"}</p>
@@ -930,9 +1049,11 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
                                   <img src={message.image} alt={message.imageName || "message upload"} className="w-full max-h-72 object-cover" />
                                 </button>
                               ) : null}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
 
@@ -1066,18 +1187,17 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
                   <input
                     type="number"
                     min={5}
-                    max={120}
                     value={draft.durationMins}
                     onChange={(e) => setDraft((p) => ({ ...p, durationMins: e.target.value }))}
                     className="mt-1 w-full bg-[var(--bg-primary)] border border-[var(--accent)]/25 rounded-xl px-3 py-2 text-sm font-semibold"
                   />
-                  <p className="mt-1 text-[10px] font-semibold text-[var(--text-secondary)]">Max room duration is 120 minutes (2 hours).</p>
+                  <p className="mt-1 text-[10px] font-semibold text-[var(--text-secondary)]">Admins can set any duration (minimum 5 minutes).</p>
                 </label>
               ) : (
                 <div className="text-xs font-bold">
                   <p>Duration (mins)</p>
                   <p className="mt-1 text-[10px] font-semibold text-[var(--text-secondary)]">
-                    Uses admin default timer: {config.defaultDurationMins} minutes.
+                    User rooms expire in 120 minutes.
                   </p>
                 </div>
               )}

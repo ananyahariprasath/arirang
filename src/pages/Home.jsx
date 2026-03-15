@@ -62,6 +62,7 @@ function Home({ onNavigateToProof, onOpenAdmin, onOpenSettings, onOpenTopicRooms
   const [isDailyUpdateModalOpen, setIsDailyUpdateModalOpen] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [isMilestoneModalOpen, setIsMilestoneModalOpen] = useState(false);
+  const [isMissionsDrawerOpen, setIsMissionsDrawerOpen] = useState(false);
   const [isOnboardingPreviewMode, setIsOnboardingPreviewMode] = useState(false);
   const [queueWinnerAfterUpdate, setQueueWinnerAfterUpdate] = useState(false);
   const [isPageReadyForPopups, setIsPageReadyForPopups] = useState(false);
@@ -142,11 +143,23 @@ function Home({ onNavigateToProof, onOpenAdmin, onOpenSettings, onOpenTopicRooms
     return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const openMissions = () => setIsMissionsDrawerOpen(true);
+    const closeMissions = () => setIsMissionsDrawerOpen(false);
+    window.addEventListener("open-daily-missions", openMissions);
+    window.addEventListener("close-daily-missions", closeMissions);
+    return () => {
+      window.removeEventListener("open-daily-missions", openMissions);
+      window.removeEventListener("close-daily-missions", closeMissions);
+    };
+  }, []);
+
   const { isExpired } = useCountdown();
   const { battles, loading } = useBattles();
   const { updates, latestUpdate, loading: dailyUpdatesLoading } = useDailyUpdates();
   const { user, token, updateUser } = useAuth();
   const toast = useToast();
+
 
   useEffect(() => {
     let active = true;
@@ -343,6 +356,8 @@ function Home({ onNavigateToProof, onOpenAdmin, onOpenSettings, onOpenTopicRooms
     isOnboardingOpen,
   ]);
 
+  const anyDrawerOpen = isRecentBattlesOpen || isContactOpen || isTopAchieversOpen || isMissionsDrawerOpen;
+
   const handleCountrySelect = (country) => {
     setSelectedCountry(country);
     setIsModalOpen(true);
@@ -357,20 +372,28 @@ function Home({ onNavigateToProof, onOpenAdmin, onOpenSettings, onOpenTopicRooms
       setIsRecentBattlesOpen(!isRecentBattlesOpen);
       setIsContactOpen(false);
       setIsTopAchieversOpen(false);
+      window.dispatchEvent(new Event("close-daily-missions"));
+    } else if (section === "missions") {
+      window.dispatchEvent(new Event("open-daily-missions"));
+      setIsRecentBattlesOpen(false);
+      setIsContactOpen(false);
+      setIsTopAchieversOpen(false);
     } else if (section === 'contact') {
       setIsContactOpen(!isContactOpen);
       setIsRecentBattlesOpen(false);
       setIsTopAchieversOpen(false);
+      window.dispatchEvent(new Event("close-daily-missions"));
     } else if (section === 'top-achievers') {
       setIsTopAchieversOpen(!isTopAchieversOpen);
       setIsRecentBattlesOpen(false);
       setIsContactOpen(false);
-      setIsTopicRoomsOpen(false);
+      window.dispatchEvent(new Event("close-daily-missions"));
     } else if (section === "topic-rooms") {
       setIsRecentBattlesOpen(false);
       setIsContactOpen(false);
       setIsTopAchieversOpen(false);
       onOpenTopicRooms?.();
+      window.dispatchEvent(new Event("close-daily-missions"));
     } else if (section === "share-milestone") {
       setIsMilestoneModalOpen(true);
     } else if (section === 'admin') {
@@ -379,6 +402,7 @@ function Home({ onNavigateToProof, onOpenAdmin, onOpenSettings, onOpenTopicRooms
       onOpenSettings?.();
     }
   };
+
 
   return (
     <div className="min-h-screen lg:h-screen lg:pb-20 lg:overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] relative flex flex-col">
@@ -465,18 +489,25 @@ function Home({ onNavigateToProof, onOpenAdmin, onOpenSettings, onOpenTopicRooms
       </section>
 
       {/* Far Right: Vertical Tabs */}
-      <div id="onboarding-quick-actions">
-        <VerticalTabs onToggleSection={handleToggleSection} />
+      <div
+        id="onboarding-quick-actions"
+        className="transition-opacity duration-200"
+      >
+        <VerticalTabs
+          onToggleSection={handleToggleSection}
+          className={anyDrawerOpen ? "opacity-0 translate-x-4 pointer-events-none" : "opacity-100 translate-x-0"}
+        />
       </div>
 
       {/* Overlay for Drawers */}
-      {(isRecentBattlesOpen || isContactOpen || isTopAchieversOpen) && (
+      {anyDrawerOpen && (
         <div 
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[90] transition-opacity duration-300"
+          className="fixed inset-0 bg-black/40 z-[90] transition-opacity duration-150"
           onClick={() => {
             setIsRecentBattlesOpen(false);
             setIsContactOpen(false);
             setIsTopAchieversOpen(false);
+            window.dispatchEvent(new Event("close-daily-missions"));
           }}
         />
       )}

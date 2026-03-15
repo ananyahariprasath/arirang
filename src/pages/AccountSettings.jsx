@@ -23,6 +23,7 @@ function AccountSettings({ onBack, onOpenAdmin }) {
   const [deleteVerified, setDeleteVerified] = useState(false);
   const [verifyingDeletePassword, setVerifyingDeletePassword] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
+  const [referralLink, setReferralLink] = useState("");
 
   useEffect(() => {
     setUsername(String(user?.username || ""));
@@ -75,6 +76,16 @@ function AccountSettings({ onBack, onOpenAdmin }) {
       active = false;
     };
   }, [token, user?.id]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const referralCode = String(user?.referralCode || user?.username || "").trim();
+    if (!referralCode) {
+      setReferralLink("");
+      return;
+    }
+    setReferralLink(`${window.location.origin}/auth?ref=${encodeURIComponent(referralCode)}`);
+  }, [user?.referralCode, user?.username]);
 
   const inferredRegion = useMemo(() => COUNTRY_REGION_MAP[country] || "", [country]);
   const isEmailChanged = useMemo(
@@ -385,6 +396,40 @@ function AccountSettings({ onBack, onOpenAdmin }) {
           >
             {loading ? "Saving..." : "Save Profile"}
           </button>
+        </div>
+
+        <div className="bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 rounded-3xl p-5 sm:p-6 mb-5">
+          <h2 className="text-lg font-black uppercase tracking-tight text-[var(--accent)]">Referral Link</h2>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            Share this link to invite friends. Verified signups count toward your referral mission.
+          </p>
+          {referralLink ? (
+            <div className="mt-4 flex flex-col sm:flex-row gap-2">
+              <input
+                value={referralLink}
+                readOnly
+                className="flex-1 bg-[var(--bg-primary)] border border-[var(--accent)]/20 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-mono outline-none focus:border-[var(--accent)]"
+              />
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(referralLink);
+                    toast.show("Referral link copied!", "success");
+                  } catch {
+                    toast.show("Copy failed. Please copy manually.", "error");
+                  }
+                }}
+                className="px-4 py-2.5 rounded-xl bg-[var(--accent)] text-white text-xs font-black uppercase tracking-widest hover:opacity-90 transition-all"
+              >
+                Copy Link
+              </button>
+            </div>
+          ) : (
+            <p className="mt-3 text-sm font-semibold text-[var(--text-secondary)]">
+              Your referral link will appear after login.
+            </p>
+          )}
         </div>
 
         <div className="bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 rounded-3xl p-5 sm:p-6">
