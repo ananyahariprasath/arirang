@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { INITIAL_REGIONS, DATA_SOURCE_URL, FOCUS_PLAYLISTS } from "../constants";
+import { INITIAL_REGIONS, DATA_SOURCE_URL, clonePlaylists } from "../constants";
 
 function normalizeRegion(region = {}) {
   const updated = { ...region };
@@ -8,7 +8,9 @@ function normalizeRegion(region = {}) {
     delete updated.hashtag;
   }
   if (!updated.playlists) {
-    updated.playlists = FOCUS_PLAYLISTS;
+    updated.playlists = clonePlaylists();
+  } else {
+    updated.playlists = clonePlaylists(updated.playlists);
   }
   return updated;
 }
@@ -86,13 +88,16 @@ export default function useRegionalData() {
   };
 
   const addRegion = (newRegion) => {
-    const updated = normalizeRegions([
-      ...regions.filter((region) => region.country !== newRegion.country),
-      newRegion,
-    ]);
-    setRegions(updated);
-    localStorage.setItem("regionalData", JSON.stringify(updated));
-    void persistRegions(updated);
+    const incoming = Array.isArray(newRegion) ? newRegion : [newRegion];
+    setRegions((prev) => {
+      const updated = normalizeRegions([
+        ...prev.filter((region) => !incoming.some((next) => next.country === region.country)),
+        ...incoming,
+      ]);
+      localStorage.setItem("regionalData", JSON.stringify(updated));
+      void persistRegions(updated);
+      return updated;
+    });
   };
 
   const deleteRegion = (country) => {
@@ -111,4 +116,3 @@ export default function useRegionalData() {
 
   return { regions, addRegion, deleteRegion, resetRegions, loading };
 }
-

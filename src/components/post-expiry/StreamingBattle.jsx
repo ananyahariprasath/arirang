@@ -334,11 +334,11 @@ function LiveBattleCard({ battle, onView, combinedProgress }) {
         <div className="text-[12px] font-black text-[var(--text-primary)]">{displayProgress}%</div>
       </div>
 
-      <div className="flex items-center justify-between gap-1">
-        <h2 className="text-[12px] font-black text-[var(--text-primary)] tracking-tight leading-tight line-clamp-2 sm:line-clamp-1">
+      <div className="flex items-start justify-between gap-2">
+        <h2 className="min-w-0 flex-1 text-[12px] font-black text-[var(--text-primary)] tracking-tight leading-snug line-clamp-2">
           {battle.title}
         </h2>
-        <span className={`inline-block border rounded-full px-2 py-0.5 whitespace-nowrap text-[8px] font-black uppercase tracking-wider ${statusClass}`}>
+        <span className={`shrink-0 inline-block border rounded-full px-2 py-0.5 whitespace-nowrap text-[8px] font-black uppercase tracking-wider ${statusClass}`}>
           {albumStatus}
         </span>
       </div>

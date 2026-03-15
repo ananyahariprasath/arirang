@@ -647,6 +647,11 @@ export const FOCUS_PLAYLISTS = {
   ]
 };
 
+export const clonePlaylists = (playlists = FOCUS_PLAYLISTS) => ({
+  spotify: (playlists.spotify || []).map((item) => ({ ...item })),
+  appleMusic: (playlists.appleMusic || []).map((item) => ({ ...item }))
+});
+
 export const DEFAULT_DAILY_MISSIONS = [
   {
     id: "mission-1",
@@ -713,7 +718,7 @@ export const INITIAL_REGIONS = [
     tz: "Asia/Kolkata",
     spotifyReset: "12:30 AM",
     appleReset: "1:30 AM",
-    playlists: FOCUS_PLAYLISTS,
+    playlists: clonePlaylists(),
     gFormUrl: "https://forms.gle/india_stream_proof"
   },
   {
@@ -723,7 +728,7 @@ export const INITIAL_REGIONS = [
     tz: "America/New_York",
     spotifyReset: "12:00 AM",
     appleReset: "1:00 AM",
-    playlists: FOCUS_PLAYLISTS,
+    playlists: clonePlaylists(),
     gFormUrl: "https://forms.gle/usa_stream_proof"
   },
   {
@@ -733,7 +738,7 @@ export const INITIAL_REGIONS = [
     tz: "Australia/Sydney",
     spotifyReset: "12:00 AM",
     appleReset: "1:00 AM",
-    playlists: FOCUS_PLAYLISTS,
+    playlists: clonePlaylists(),
     gFormUrl: "https://forms.gle/oceania_stream_proof"
   }
 ];
@@ -745,7 +750,7 @@ export const GLOBAL_DEFAULT = {
   tz: "UTC",
   spotifyReset: "12:00 AM",
   appleReset: "1:00 AM",
-  playlists: FOCUS_PLAYLISTS,
+  playlists: clonePlaylists(),
   gFormUrl: "https://forms.gle/global_stream_proof"
 };
 
