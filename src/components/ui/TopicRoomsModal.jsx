@@ -254,8 +254,11 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
     [activeRooms, currentUserRoomIdentity]
   );
   const visibleActiveRooms = useMemo(
-    () => activeRooms.filter((room) => !exitedRoomIds.includes(room.id)),
-    [activeRooms, exitedRoomIds]
+    () =>
+      activeRooms.filter((room) =>
+        !exitedRoomIds.includes(room.id) || isUserInRoom(room) || isCreatorOfRoom(room)
+      ),
+    [activeRooms, exitedRoomIds, currentUserRoomIdentity]
   );
 
   const canCreateRoom = isAdmin || (activeRooms.length < config.maxActiveRooms && !currentUserCreatedActiveRoom);
