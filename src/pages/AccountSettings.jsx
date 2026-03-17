@@ -24,6 +24,10 @@ function AccountSettings({ onBack, onOpenAdmin }) {
   const [verifyingDeletePassword, setVerifyingDeletePassword] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [referralLink, setReferralLink] = useState("");
+  const [scrobblerType, setScrobblerType] = useState("");
+  const [scrobblerLink, setScrobblerLink] = useState("");
+  const [scrobblerError, setScrobblerError] = useState("");
+  const [scrobblerSaving, setScrobblerSaving] = useState(false);
 
   useEffect(() => {
     setUsername(String(user?.username || ""));
@@ -32,7 +36,10 @@ function AccountSettings({ onBack, onOpenAdmin }) {
     setBaselineEmail(nextEmail);
     setCountry(String(user?.country || ""));
     setRegion(String(user?.region || ""));
-  }, [user?.username, user?.email, user?.country, user?.region]);
+    const nextScrobblerType = user?.lastfmUsername ? "lastfm" : String(user?.scrobblerType || "");
+    setScrobblerType(nextScrobblerType);
+    setScrobblerLink(String(user?.scrobblerLink || ""));
+  }, [user?.username, user?.email, user?.country, user?.region, user?.lastfmUsername, user?.scrobblerType, user?.scrobblerLink]);
 
   useEffect(() => {
     if (!token || !user?.id) return;
@@ -65,6 +72,8 @@ function AccountSettings({ onBack, onOpenAdmin }) {
           country: nextCountry || null,
           region: nextRegion || null,
           lastfmUsername: data?.user?.lastfmUsername || null,
+          scrobblerType: data?.user?.scrobblerType || null,
+          scrobblerLink: data?.user?.scrobblerLink || null,
         });
       } finally {
         if (active) setProfileLoading(false);
@@ -198,6 +207,85 @@ function AccountSettings({ onBack, onOpenAdmin }) {
       toast.show(error.message || "Failed to update profile", "error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveScrobbler = async () => {
+    if (!token) return;
+    setScrobblerError("");
+    const currentConnectedType = user?.lastfmUsername
+      ? "lastfm"
+      : (user?.scrobblerLink ? String(user?.scrobblerType || "") : "");
+    if (currentConnectedType && currentConnectedType !== scrobblerType) {
+      setScrobblerError("Disconnect your existing scrobbler to add a new one.");
+      return;
+    }
+
+    if (scrobblerType === "lastfm") {
+      const apiKey = "464d8861f37218838766eef3f52b0bb0";
+      const cb = window.location.origin;
+      window.location.href = `https://www.last.fm/api/auth/?api_key=${apiKey}&cb=${cb}`;
+      return;
+    }
+
+    if (!scrobblerType) {
+      return handleClearScrobbler();
+    }
+
+    const link = scrobblerLink.trim();
+    if (!link) {
+      setScrobblerError("Please paste your scrobbler link.");
+      return;
+    }
+
+    setScrobblerSaving(true);
+    try {
+      const response = await fetch("/api/auth/scrobbler-connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ scrobblerType, scrobblerLink: link }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to save scrobbler");
+      }
+      updateUser({
+        scrobblerType: data?.user?.scrobblerType || scrobblerType,
+        scrobblerLink: data?.user?.scrobblerLink || link,
+      });
+      toast.show("Scrobbler saved.", "success");
+    } catch (error) {
+      setScrobblerError(error.message || "Failed to save scrobbler");
+    } finally {
+      setScrobblerSaving(false);
+    }
+  };
+
+  const handleClearScrobbler = async () => {
+    if (!token) return;
+    setScrobblerSaving(true);
+    setScrobblerError("");
+    try {
+      const response = await fetch("/api/auth/scrobbler-connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ scrobblerType: "" }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to disconnect scrobbler");
+      }
+      updateUser({
+        scrobblerType: data?.user?.scrobblerType || null,
+        scrobblerLink: data?.user?.scrobblerLink || null,
+      });
+      setScrobblerLink("");
+      setScrobblerType(user?.lastfmUsername ? "lastfm" : "");
+      toast.show("Scrobbler disconnected.", "success");
+    } catch (error) {
+      setScrobblerError(error.message || "Failed to disconnect scrobbler");
+    } finally {
+      setScrobblerSaving(false);
     }
   };
 
@@ -399,6 +487,76 @@ function AccountSettings({ onBack, onOpenAdmin }) {
         </div>
 
         <div className="bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 rounded-3xl p-5 sm:p-6 mb-5">
+          <h2 className="text-lg font-black uppercase tracking-tight text-[var(--accent)]">Scrobbler</h2>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            Connect your scrobbler so you are counted as online. Last.fm uses auto sync. stats.fm and Musicat need a profile link.
+          </p>
+
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Scrobbler</p>
+              <select
+                value={scrobblerType}
+                onChange={(e) => {
+                  setScrobblerType(e.target.value);
+                  setScrobblerError("");
+                }}
+                className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm outline-none focus:border-[var(--accent)]"
+              >
+                <option value="">Not connected</option>
+                <option value="lastfm">Last.fm</option>
+                <option value="statsfm">stats.fm</option>
+                <option value="musicat">Musicat</option>
+              </select>
+            </div>
+            {scrobblerType && scrobblerType !== "lastfm" && (
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Profile Link</p>
+                <input
+                  value={scrobblerLink}
+                  onChange={(e) => setScrobblerLink(e.target.value)}
+                  placeholder="Paste your profile link"
+                  className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+            )}
+          </div>
+
+          {user?.lastfmUsername && scrobblerType === "lastfm" && (
+            <p className="mt-3 text-xs font-semibold text-emerald-300">
+              Connected: {user.lastfmUsername}
+            </p>
+          )}
+          {user?.scrobblerLink && scrobblerType !== "lastfm" && (
+            <p className="mt-3 text-xs font-semibold text-[var(--text-secondary)] break-all">
+              Current link: {user.scrobblerLink}
+            </p>
+          )}
+          {scrobblerError && <p className="mt-2 text-xs font-bold text-red-400">{scrobblerError}</p>}
+
+          <div className="mt-4 flex flex-col sm:flex-row gap-2">
+            {scrobblerType !== "lastfm" && (user?.scrobblerLink || scrobblerLink) && (
+              <button
+                type="button"
+                onClick={() => void handleClearScrobbler()}
+                disabled={scrobblerSaving}
+                className="px-4 py-2.5 rounded-xl border border-red-400/30 text-red-300 text-xs font-black uppercase tracking-widest hover:bg-red-500/10 transition-all disabled:opacity-50"
+              >
+                Disconnect
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => void handleSaveScrobbler()}
+              disabled={scrobblerSaving}
+              className="px-4 py-2.5 rounded-xl bg-[var(--accent)] text-white text-xs font-black uppercase tracking-widest hover:opacity-90 transition-all disabled:opacity-50"
+            >
+              {scrobblerType === "lastfm" ? "Connect Last.fm" : "Save Scrobbler"}
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 rounded-3xl p-5 sm:p-6 mb-5">
           <h2 className="text-lg font-black uppercase tracking-tight text-[var(--accent)]">Referral Link</h2>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
             Share this link to invite friends. Verified signups count toward your referral mission.
@@ -436,8 +594,14 @@ function AccountSettings({ onBack, onOpenAdmin }) {
           <h2 className="text-lg font-black uppercase tracking-tight text-[var(--accent)]">Connections & Security</h2>
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="rounded-xl border border-[var(--accent)]/15 bg-[var(--bg-primary)]/50 p-3">
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Last.fm</p>
-              <p className="mt-1 text-sm font-bold">{user?.lastfmUsername || "Not connected"}</p>
+              <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Scrobbler</p>
+              <p className="mt-1 text-sm font-bold">
+                {user?.lastfmUsername
+                  ? `Last.fm: ${user.lastfmUsername}`
+                  : user?.scrobblerLink
+                    ? `Manual: ${user.scrobblerType || "link"}`
+                    : "Not connected"}
+              </p>
             </div>
             <div className="rounded-xl border border-[var(--accent)]/15 bg-[var(--bg-primary)]/50 p-3">
               <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Account</p>

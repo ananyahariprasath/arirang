@@ -15,7 +15,7 @@ function ConfirmModal({ isOpen, onClose, onConfirm, title, message, confirmText 
                         : "bg-[var(--card-bg)]/80 backdrop-blur-2xl border-2 border-[var(--accent)]/30 text-[var(--text-primary)]"
                     }`}
       >
-        <h2 className="text-2xl font-black mb-4 text-center uppercase tracking-tighter italic">
+        <h2 className="text-2xl font-black mb-4 text-center uppercase tracking-tighter">
           {title}
         </h2>
         

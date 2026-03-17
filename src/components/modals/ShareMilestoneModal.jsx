@@ -4,7 +4,7 @@ import { useToast } from "../../context/ToastContext";
 const MILESTONES = [
   { id: "joined", label: "Joined Campaign", template: "I just joined the ARIRANG streaming campaign." },
   { id: "country", label: "Country Set", template: "My region is ready for ARIRANG streaming goals." },
-  { id: "lastfm", label: "Last.fm Connected", template: "My Last.fm is connected and I am ready to track streams." },
+  { id: "lastfm", label: "Scrobbler Connected", template: "My scrobbler is connected and I am ready to track streams." },
   { id: "battle", label: "Battle Ready", template: "Battle setup done. Team, let us stream hard." },
   { id: "live", label: "Battle Live", template: "Battle is live now. Let us push together." },
 ];

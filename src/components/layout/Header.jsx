@@ -207,6 +207,11 @@ function Header({ onToggleSection }) {
   const [socialHandle, setSocialHandle] = useState("");
   const [justCompletedMissionId, setJustCompletedMissionId] = useState(null);
   const [referralVerifiedCount, setReferralVerifiedCount] = useState(0);
+  const [isScrobblerModalOpen, setIsScrobblerModalOpen] = useState(false);
+  const [scrobblerType, setScrobblerType] = useState("lastfm");
+  const [scrobblerLink, setScrobblerLink] = useState("");
+  const [scrobblerError, setScrobblerError] = useState("");
+  const [scrobblerSaving, setScrobblerSaving] = useState(false);
 
   const profileRef = useRef(null);
   const mobileMenuRef = useRef(null);
@@ -463,7 +468,93 @@ function Header({ onToggleSection }) {
   const referralLink = referralCode && typeof window !== "undefined"
     ? `${window.location.origin}/auth?ref=${encodeURIComponent(referralCode)}`
     : "";
+  const hasScrobblerConnected = Boolean(user?.lastfmUsername || user?.scrobblerLink);
+  const scrobblerCtaLabel = hasScrobblerConnected ? "Manage Scrobbler" : "Connect your Scrobbler";
   const LUCKY_DRAW_SOCIALS = ["instagram", "twitter", "facebook", "telegram", "discord", "weverse"];
+
+  const openScrobblerModal = () => {
+    const nextType = user?.lastfmUsername
+      ? "lastfm"
+      : String(user?.scrobblerType || "lastfm");
+    setScrobblerType(nextType);
+    setScrobblerLink(String(user?.scrobblerLink || ""));
+    setScrobblerError("");
+    setIsScrobblerModalOpen(true);
+  };
+
+  const handleSaveScrobbler = async () => {
+    if (!token) return;
+    const currentConnectedType = user?.lastfmUsername
+      ? "lastfm"
+      : (user?.scrobblerLink ? String(user?.scrobblerType || "") : "");
+    if (currentConnectedType && currentConnectedType !== scrobblerType) {
+      setScrobblerError("Disconnect your existing scrobbler to add a new one.");
+      return;
+    }
+    if (scrobblerType === "lastfm") {
+      const apiKey = "464d8861f37218838766eef3f52b0bb0";
+      const cb = window.location.origin;
+      window.location.href = `https://www.last.fm/api/auth/?api_key=${apiKey}&cb=${cb}`;
+      return;
+    }
+    const link = String(scrobblerLink || "").trim();
+    if (!link) {
+      setScrobblerError("Please paste your scrobbler link.");
+      return;
+    }
+
+    setScrobblerSaving(true);
+    setScrobblerError("");
+    try {
+      const response = await fetch("/api/auth/scrobbler-connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ scrobblerType, scrobblerLink: link }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to save scrobbler link");
+      }
+      updateUser({
+        scrobblerType: data?.user?.scrobblerType || scrobblerType,
+        scrobblerLink: data?.user?.scrobblerLink || link,
+      });
+      toast.show("Scrobbler saved.", "success");
+      setIsScrobblerModalOpen(false);
+    } catch (error) {
+      setScrobblerError(error.message || "Failed to save scrobbler link");
+    } finally {
+      setScrobblerSaving(false);
+    }
+  };
+
+  const handleClearScrobbler = async () => {
+    if (!token) return;
+    setScrobblerSaving(true);
+    setScrobblerError("");
+    try {
+      const response = await fetch("/api/auth/scrobbler-connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ scrobblerType: "" }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to disconnect scrobbler");
+      }
+      updateUser({
+        scrobblerType: data?.user?.scrobblerType || null,
+        scrobblerLink: data?.user?.scrobblerLink || null,
+      });
+      setScrobblerLink("");
+      toast.show("Scrobbler disconnected.", "success");
+      setIsScrobblerModalOpen(false);
+    } catch (error) {
+      setScrobblerError(error.message || "Failed to disconnect scrobbler");
+    } finally {
+      setScrobblerSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (!isLuckyDrawModalOpen) return;
@@ -815,21 +906,18 @@ function Header({ onToggleSection }) {
                           <IconDisconnect /> Disconnect Last.fm
                         </div>
                       </button>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setIsProfileDropdownOpen(false);
-                          const apiKey = "464d8861f37218838766eef3f52b0bb0";
-                          const cb = window.location.origin;
-                          window.location.href = `https://www.last.fm/api/auth/?api_key=${apiKey}&cb=${cb}`;
-                        }}
-                        className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--accent)]/10 transition-colors flex items-center justify-between"
-                      >
-                        <div className="flex items-center gap-2">
-                          <IconMusic /> Connect Last.fm
-                        </div>
-                      </button>
-                    )}
+                    ) : null}
+                    <button
+                      onClick={() => {
+                        setIsProfileDropdownOpen(false);
+                        openScrobblerModal();
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--accent)]/10 transition-colors flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2">
+                        <IconMusic /> {scrobblerCtaLabel}
+                      </div>
+                    </button>
 
                     <button
                       onClick={() => {
@@ -1149,19 +1237,16 @@ function Header({ onToggleSection }) {
                         >
                           <IconDisconnect /> Disconnect LF
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            setIsMenuOpen(false);
-                            const apiKey = "464d8861f37218838766eef3f52b0bb0";
-                            const cb = window.location.origin;
-                            window.location.href = `https://www.last.fm/api/auth/?api_key=${apiKey}&cb=${cb}`;
-                          }}
-                          className="w-full px-5 py-3 text-[10px] font-black rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all flex items-center justify-center gap-2 tracking-widest uppercase"
-                        >
-                          <IconMusic /> Connect Last.fm
-                        </button>
-                      )}
+                      ) : null}
+                      <button
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          openScrobblerModal();
+                        }}
+                        className="w-full px-5 py-3 text-[10px] font-black rounded-xl bg-[var(--card-bg)]/60 border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all flex items-center justify-center gap-2 tracking-widest uppercase"
+                      >
+                        <IconMusic /> {scrobblerCtaLabel}
+                      </button>
 
                       <button
                         onClick={() => {
@@ -1455,6 +1540,97 @@ function Header({ onToggleSection }) {
       )}
 
       <HelpDeskModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+      {isScrobblerModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="w-[92%] max-w-md rounded-3xl p-6 sm:p-7 shadow-2xl bg-[var(--card-bg)]/85 backdrop-blur-2xl border border-[var(--accent)]/30 text-[var(--text-primary)]">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-xl font-black uppercase tracking-tight text-[var(--accent)]">Connect Your Scrobbler</h2>
+                <p className="text-[11px] font-semibold text-[var(--text-secondary)] mt-1">
+                  Last.fm connects automatically. stats.fm and Musicat require a profile link.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsScrobblerModalOpen(false)}
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                aria-label="Close scrobbler modal"
+              >
+                X
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Scrobbler</p>
+                <select
+                  value={scrobblerType}
+                  onChange={(e) => {
+                    setScrobblerType(e.target.value);
+                    setScrobblerError("");
+                  }}
+                  className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm outline-none focus:border-[var(--accent)]"
+                >
+                  <option value="lastfm">Last.fm</option>
+                  <option value="statsfm">stats.fm</option>
+                  <option value="musicat">Musicat</option>
+                </select>
+              </div>
+
+              {scrobblerType !== "lastfm" && (
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70 mb-1">Profile Link</p>
+                  <input
+                    value={scrobblerLink}
+                    onChange={(e) => setScrobblerLink(e.target.value)}
+                    placeholder="Paste your profile link"
+                    className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm outline-none focus:border-[var(--accent)]"
+                  />
+                </div>
+              )}
+
+              {user?.lastfmUsername && scrobblerType === "lastfm" && (
+                <p className="text-xs font-semibold text-emerald-300">
+                  Connected: {user.lastfmUsername}
+                </p>
+              )}
+              {user?.scrobblerLink && scrobblerType !== "lastfm" && (
+                <p className="text-xs font-semibold text-[var(--text-secondary)] break-all">
+                  Current link: {user.scrobblerLink}
+                </p>
+              )}
+              {scrobblerError && <p className="text-xs font-bold text-red-400">{scrobblerError}</p>}
+            </div>
+
+            <div className="mt-5 flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={() => setIsScrobblerModalOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-[var(--accent)]/30 text-[var(--text-secondary)] font-bold hover:bg-[var(--accent)]/10 transition-all"
+              >
+                Cancel
+              </button>
+              {scrobblerType !== "lastfm" && (user?.scrobblerLink || scrobblerLink) && (
+                <button
+                  type="button"
+                  onClick={handleClearScrobbler}
+                  disabled={scrobblerSaving}
+                  className="flex-1 py-2.5 rounded-xl border border-red-400/30 text-red-300 font-bold hover:bg-red-500/10 transition-all disabled:opacity-50"
+                >
+                  Disconnect
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleSaveScrobbler}
+                disabled={scrobblerSaving}
+                className="flex-1 py-2.5 rounded-xl bg-[var(--accent)] text-white font-bold hover:opacity-90 transition-all disabled:opacity-50"
+              >
+                {scrobblerType === "lastfm" ? "Connect Last.fm" : "Save Link"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div id="google_translate_element" className="hidden" />
 
       <ConfirmModal 
@@ -1468,7 +1644,12 @@ function Header({ onToggleSection }) {
               body: JSON.stringify({ userId: user.id })
             });
             if (res.ok) {
-              updateUser({ ...user, lastfmUsername: null });
+              updateUser({
+                ...user,
+                lastfmUsername: null,
+                scrobblerType: user?.scrobblerType === "lastfm" ? null : user?.scrobblerType,
+                scrobblerLink: user?.scrobblerType === "lastfm" ? null : user?.scrobblerLink,
+              });
             }
           } catch (err) {
             console.error("Disconnect error:", err);

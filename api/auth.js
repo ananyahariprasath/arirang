@@ -13,6 +13,12 @@ const BATTLE_START_AT_ISO = "2026-03-20T13:00:00+09:00";
 const USERNAME_REGEX = /^[A-Za-z0-9_]+$/;
 const STRONG_PASSWORD_REGEX = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const SCROBBLER_TYPES = ["lastfm", "statsfm", "musicat"];
+
+function normalizeScrobblerType(value = "") {
+  const next = String(value || "").trim().toLowerCase();
+  return SCROBBLER_TYPES.includes(next) ? next : "";
+}
 
 function renderOtpEmailHtml({ heading, subheading, otp, expiryMinutes = 2 }) {
   return `
@@ -351,6 +357,8 @@ async function handleLogin(req, res) {
       role: user.role,
       profilePicture: user.profilePicture || null,
       lastfmUsername: user.lastfmUsername || null,
+      scrobblerType: user.scrobblerType || null,
+      scrobblerLink: user.scrobblerLink || null,
       country: user.country || null,
       region: user.region || null,
       referralCode: user.referralCode || user.username || null,
@@ -452,6 +460,8 @@ async function handleSignup(req, res) {
     country,
     region,
     role: "user",
+    scrobblerType: null,
+    scrobblerLink: null,
     onboardingComplete: false,
     onboardingSnoozeUntil: null,
     referredBy: referrer ? referrer._id.toString() : null,
@@ -513,6 +523,8 @@ async function handleSignup(req, res) {
       region: newUser.region,
       profilePicture: null,
       lastfmUsername: null,
+      scrobblerType: null,
+      scrobblerLink: null,
       referralCode: newUser.referralCode,
       onboardingComplete: false,
       onboardingSnoozeUntil: null,
@@ -1007,7 +1019,7 @@ async function handleProfile(req, res) {
   if (req.method === "GET") {
     const user = await usersCollection.findOne(
       { _id: objectId },
-      { projection: { username: 1, email: 1, country: 1, region: 1, lastfmUsername: 1, createdAt: 1 } }
+      { projection: { username: 1, email: 1, country: 1, region: 1, lastfmUsername: 1, scrobblerType: 1, scrobblerLink: 1, createdAt: 1 } }
     );
     if (!user) return res.status(404).json({ error: "User not found" });
     return res.status(200).json({
@@ -1018,6 +1030,8 @@ async function handleProfile(req, res) {
         country: user.country || null,
         region: user.region || null,
         lastfmUsername: user.lastfmUsername || null,
+        scrobblerType: user.scrobblerType || null,
+        scrobblerLink: user.scrobblerLink || null,
         createdAt: user.createdAt || null,
       },
     });
@@ -1106,7 +1120,7 @@ async function handleProfile(req, res) {
   const result = await usersCollection.findOneAndUpdate(
     { _id: objectId },
     updateDoc,
-    { returnDocument: "after", projection: { username: 1, email: 1, country: 1, region: 1, lastfmUsername: 1, createdAt: 1 } }
+    { returnDocument: "after", projection: { username: 1, email: 1, country: 1, region: 1, lastfmUsername: 1, scrobblerType: 1, scrobblerLink: 1, createdAt: 1 } }
   );
   if (!result) return res.status(404).json({ error: "User not found" });
 
@@ -1118,7 +1132,90 @@ async function handleProfile(req, res) {
       country: result.country || null,
       region: result.region || null,
       lastfmUsername: result.lastfmUsername || null,
+      scrobblerType: result.scrobblerType || null,
+      scrobblerLink: result.scrobblerLink || null,
       createdAt: result.createdAt || null,
+    },
+  });
+}
+
+async function handleScrobblerConnect(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  const decoded = verifyUserRequest(req, res);
+  if (!decoded) return;
+
+  const userId = String(decoded.id || "").trim();
+  if (!ObjectId.isValid(userId)) {
+    return res.status(400).json({ error: "Invalid user ID format" });
+  }
+
+  const scrobblerType = normalizeScrobblerType(req.body?.scrobblerType);
+  const scrobblerLink = String(req.body?.scrobblerLink || "").trim();
+
+  const db = await getDb();
+  const usersCollection = db.collection("users");
+  const objectId = new ObjectId(userId);
+  const existing = await usersCollection.findOne(
+    { _id: objectId },
+    { projection: { lastfmUsername: 1, scrobblerType: 1, scrobblerLink: 1 } }
+  );
+  if (!existing) return res.status(404).json({ error: "User not found" });
+
+  if (!scrobblerType) {
+    const result = await usersCollection.findOneAndUpdate(
+      { _id: objectId },
+      { $unset: { scrobblerType: "", scrobblerLink: "", scrobblerLinkedAt: "" } },
+      { returnDocument: "after", projection: { username: 1, email: 1, lastfmUsername: 1, scrobblerType: 1, scrobblerLink: 1 } }
+    );
+    if (!result) return res.status(404).json({ error: "User not found" });
+    return res.status(200).json({
+      success: true,
+      user: {
+        username: String(result.username || ""),
+        email: String(result.email || ""),
+        lastfmUsername: result.lastfmUsername || null,
+        scrobblerType: result.scrobblerType || null,
+        scrobblerLink: result.scrobblerLink || null,
+      },
+    });
+  }
+
+  if (scrobblerType === "lastfm") {
+    return res.status(400).json({ error: "Please connect Last.fm using the authentication flow." });
+  }
+
+  const hasLastfm = String(existing.lastfmUsername || "").trim().length > 0;
+  if (hasLastfm) {
+    return res.status(400).json({ error: "Disconnect your existing scrobbler before adding a new one." });
+  }
+  const existingManualType = normalizeScrobblerType(existing.scrobblerType);
+  const existingManualLink = String(existing.scrobblerLink || "").trim();
+  if (existingManualType && existingManualType !== scrobblerType && existingManualLink) {
+    return res.status(400).json({ error: "Disconnect your existing scrobbler before adding a new one." });
+  }
+
+  if (!scrobblerLink) {
+    return res.status(400).json({ error: "Scrobbler link is required." });
+  }
+
+  const result = await usersCollection.findOneAndUpdate(
+    { _id: objectId },
+    { $set: { scrobblerType, scrobblerLink, scrobblerLinkedAt: new Date() } },
+    { returnDocument: "after", projection: { username: 1, email: 1, lastfmUsername: 1, scrobblerType: 1, scrobblerLink: 1 } }
+  );
+  if (!result) return res.status(404).json({ error: "User not found" });
+
+  return res.status(200).json({
+    success: true,
+    user: {
+      username: String(result.username || ""),
+      email: String(result.email || ""),
+      lastfmUsername: result.lastfmUsername || null,
+      scrobblerType: result.scrobblerType || null,
+      scrobblerLink: result.scrobblerLink || null,
     },
   });
 }
@@ -1171,9 +1268,14 @@ async function handleLastfmSession(req, res) {
     if (!userId) return res.status(400).json({ error: "userId is required" });
 
     const db = await getDb();
-    await db.collection("users").updateOne(
+    const usersCollection = db.collection("users");
+    await usersCollection.updateOne(
       { _id: new ObjectId(userId) },
       { $unset: { lastfmUsername: "", lastfmSessionKey: "", lastfmLinkedAt: "" } }
+    );
+    await usersCollection.updateOne(
+      { _id: new ObjectId(userId), scrobblerType: "lastfm" },
+      { $unset: { scrobblerType: "", scrobblerLink: "", scrobblerLinkedAt: "" } }
     );
 
     return res.status(200).json({ success: true, message: "Last.fm disconnected" });
@@ -1214,6 +1316,17 @@ async function handleLastfmSession(req, res) {
 
   const db = await getDb();
   const usersCollection = db.collection("users");
+  const existing = await usersCollection.findOne(
+    { _id: new ObjectId(userId) },
+    { projection: { scrobblerType: 1, scrobblerLink: 1 } }
+  );
+  if (!existing) {
+    return res.status(404).json({ error: "User not found" });
+  }
+  const existingType = normalizeScrobblerType(existing.scrobblerType);
+  if (existingType && existingType !== "lastfm" && String(existing.scrobblerLink || "").trim().length > 0) {
+    return res.status(400).json({ error: "Disconnect your existing scrobbler before adding a new one." });
+  }
 
   await usersCollection.updateOne(
     { _id: new ObjectId(userId) },
@@ -1222,6 +1335,8 @@ async function handleLastfmSession(req, res) {
         lastfmUsername,
         lastfmSessionKey,
         lastfmLinkedAt: new Date(),
+        scrobblerType: "lastfm",
+        scrobblerLink: null,
       },
     }
   );
@@ -1444,13 +1559,17 @@ async function handleUsersSummary(req, res) {
 
   const users = await usersCollection
     .find({})
-    .project({ _id: 0, role: 1, username: 1, email: 1, lastfmUsername: 1 })
+    .project({ _id: 0, role: 1, username: 1, email: 1, lastfmUsername: 1, scrobblerType: 1, scrobblerLink: 1 })
     .toArray();
 
   const regularUsers = users.filter((u) => (u.role || "user") !== "admin");
   const getDisplayName = (user) => String(user?.username || user?.email || "").trim();
-  const connectedUsers = regularUsers.filter((u) => String(u.lastfmUsername || "").trim().length > 0);
-  const notConnectedUsers = regularUsers.filter((u) => String(u.lastfmUsername || "").trim().length === 0);
+  const connectedUsers = regularUsers.filter((u) => {
+    const hasLastfm = String(u.lastfmUsername || "").trim().length > 0;
+    const hasManual = String(u.scrobblerLink || "").trim().length > 0;
+    return hasLastfm || hasManual;
+  });
+  const notConnectedUsers = regularUsers.filter((u) => !connectedUsers.includes(u));
   const connectedCount = connectedUsers.length;
   const totalUsers = regularUsers.length;
   const notConnectedCount = Math.max(0, totalUsers - connectedCount);
@@ -1462,18 +1581,44 @@ async function handleUsersSummary(req, res) {
     .map(getDisplayName)
     .filter(Boolean)
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  const lastfmUsers = regularUsers
+    .filter((u) => String(u.lastfmUsername || "").trim().length > 0)
+    .map((u) => ({
+      username: getDisplayName(u),
+      lastfmUsername: String(u.lastfmUsername || "").trim(),
+    }))
+    .filter((u) => u.username && u.lastfmUsername)
+    .sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: "base" }));
+  const manualScrobblers = regularUsers
+    .filter((u) => {
+      const type = normalizeScrobblerType(u.scrobblerType);
+      return type && type !== "lastfm" && String(u.scrobblerLink || "").trim().length > 0;
+    })
+    .map((u) => ({
+      username: getDisplayName(u),
+      scrobblerType: normalizeScrobblerType(u.scrobblerType) || null,
+      scrobblerLink: String(u.scrobblerLink || "").trim(),
+    }))
+    .filter((u) => u.username && u.scrobblerLink)
+    .sort((a, b) => a.username.localeCompare(b.username, undefined, { sensitivity: "base" }));
+  const statsfmUsers = manualScrobblers.filter((row) => row.scrobblerType === "statsfm");
+  const musicatUsers = manualScrobblers.filter((row) => row.scrobblerType === "musicat");
 
   return res.status(200).json({
     success: true,
     counts: {
       signups: totalUsers,
-      lastfmConnected: connectedCount,
-      lastfmNotConnected: notConnectedCount,
+      scrobblerConnected: connectedCount,
+      scrobblerNotConnected: notConnectedCount,
     },
     usernames: {
-      lastfmConnected: connectedUsernames,
-      lastfmNotConnected: notConnectedUsernames,
+      scrobblerConnected: connectedUsernames,
+      scrobblerNotConnected: notConnectedUsernames,
     },
+    manualScrobblers,
+    lastfmUsers,
+    statsfmUsers,
+    musicatUsers,
     generatedAt: new Date().toISOString(),
   });
 }
@@ -1952,6 +2097,8 @@ export default async function handler(req, res) {
         return await handleProfilePreferences(req, res);
       case "profile":
         return await handleProfile(req, res);
+      case "scrobbler-connect":
+        return await handleScrobblerConnect(req, res);
       case "profile-email-otp-send":
         return await handleProfileEmailOtpSend(req, res);
       case "profile-email-otp-verify":

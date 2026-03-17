@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
+import ConfirmModal from "../modals/ConfirmModal";
 
 const DEFAULT_COVER = "/assets/images/bts-un-photo-1.jpg";
 const TOPIC_ROOMS_EXITED_KEY_PREFIX = "topic_rooms_exited_v1_";
@@ -53,6 +54,8 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
   const [selectedRoomId, setSelectedRoomId] = useState("");
   const [previewImage, setPreviewImage] = useState(null);
   const [reportingMessageId, setReportingMessageId] = useState("");
+  const [isReportConfirmOpen, setIsReportConfirmOpen] = useState(false);
+  const [pendingReportMessage, setPendingReportMessage] = useState(null);
 
   const [config, setConfig] = useState({
     maxActiveRooms: 10,
@@ -1030,8 +1033,21 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
                                     </div>
                                     <div className="flex items-center gap-2">
                                       {!isSelf ? (
-                                        <button type="button" onClick={() => void handleReportUser(selectedRoom, message)} disabled={reportingMessageId === String(message.id)} className="px-2.5 py-1 rounded-full border border-red-400/40 text-red-300 text-[9px] font-black uppercase tracking-widest hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                                          {reportingMessageId === String(message.id) ? "Reporting..." : "Report User"}
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setPendingReportMessage(message);
+                                            setIsReportConfirmOpen(true);
+                                          }}
+                                          disabled={reportingMessageId === String(message.id)}
+                                          title={reportingMessageId === String(message.id) ? "Reporting..." : "Report user"}
+                                          aria-label="Report user"
+                                          className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-red-400/40 text-red-300 hover:bg-red-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                          <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5" aria-hidden="true">
+                                            <path d="M6 3v18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                            <path d="M6 4.5c2.2-1.4 4.6-1.4 6.8 0 2.2 1.4 4.6 1.4 6.8 0v8c-2.2 1.4-4.6 1.4-6.8 0-2.2-1.4-4.6-1.4-6.8 0v-8z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+                                          </svg>
                                         </button>
                                       ) : null}
                                     </div>
@@ -1288,6 +1304,31 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
           </div>
         </div>
       ) : null}
+      <ConfirmModal
+        isOpen={isReportConfirmOpen}
+        onClose={() => {
+          setIsReportConfirmOpen(false);
+          setPendingReportMessage(null);
+        }}
+        onConfirm={() => {
+          if (!pendingReportMessage || !selectedRoom) return;
+          setIsReportConfirmOpen(false);
+          void handleReportUser(selectedRoom, pendingReportMessage);
+          setPendingReportMessage(null);
+        }}
+        title="Report User"
+        message={
+          <>
+            Do you wish to report user{" "}
+            <span className="text-[var(--accent)] font-bold">
+              {String(pendingReportMessage?.author || "this user")}
+            </span>
+            ?
+          </>
+        }
+        confirmText="Yes, Report"
+        cancelText="No, Cancel"
+      />
     </>
   );
 }

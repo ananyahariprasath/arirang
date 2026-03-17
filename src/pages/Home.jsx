@@ -305,7 +305,7 @@ function Home({ onNavigateToProof, onOpenAdmin, onOpenSettings, onOpenTopicRooms
 
         const data = await res.json();
         if (res.ok) {
-          updateUser({ lastfmUsername: data.lastfmUsername });
+          updateUser({ lastfmUsername: data.lastfmUsername, scrobblerType: "lastfm", scrobblerLink: null });
           toast.show(`Successfully linked Last.fm account: ${data.lastfmUsername}`, "success");
         } else {
           toast.show(data.error || "Failed to link Last.fm", "error");

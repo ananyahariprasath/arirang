@@ -320,10 +320,14 @@ function AdminPanel() {
   const [ticketsError, setTicketsError] = useState("");
   const [userSummary, setUserSummary] = useState({
     signups: 0,
-    lastfmConnected: 0,
-    lastfmNotConnected: 0,
+    scrobblerConnected: 0,
+    scrobblerNotConnected: 0,
     connectedUsernames: [],
     notConnectedUsernames: [],
+    manualScrobblers: [],
+    lastfmUsers: [],
+    statsfmUsers: [],
+    musicatUsers: [],
   });
   const [userSummaryLoading, setUserSummaryLoading] = useState(true);
   const [userSummaryError, setUserSummaryError] = useState("");
@@ -616,10 +620,14 @@ function AdminPanel() {
         if (active) {
           setUserSummary({
             signups: Number(data?.counts?.signups || 0),
-            lastfmConnected: Number(data?.counts?.lastfmConnected || 0),
-            lastfmNotConnected: Number(data?.counts?.lastfmNotConnected || 0),
-            connectedUsernames: Array.isArray(data?.usernames?.lastfmConnected) ? data.usernames.lastfmConnected : [],
-            notConnectedUsernames: Array.isArray(data?.usernames?.lastfmNotConnected) ? data.usernames.lastfmNotConnected : [],
+            scrobblerConnected: Number(data?.counts?.scrobblerConnected || 0),
+            scrobblerNotConnected: Number(data?.counts?.scrobblerNotConnected || 0),
+            connectedUsernames: Array.isArray(data?.usernames?.scrobblerConnected) ? data.usernames.scrobblerConnected : [],
+            notConnectedUsernames: Array.isArray(data?.usernames?.scrobblerNotConnected) ? data.usernames.scrobblerNotConnected : [],
+            manualScrobblers: Array.isArray(data?.manualScrobblers) ? data.manualScrobblers : [],
+            lastfmUsers: Array.isArray(data?.lastfmUsers) ? data.lastfmUsers : [],
+            statsfmUsers: Array.isArray(data?.statsfmUsers) ? data.statsfmUsers : [],
+            musicatUsers: Array.isArray(data?.musicatUsers) ? data.musicatUsers : [],
           });
         }
       } catch (error) {
@@ -1484,12 +1492,12 @@ function AdminPanel() {
                 <p className="text-2xl font-black text-[var(--accent)] mt-1">{userSummary.signups.toLocaleString()}</p>
               </div>
               <div className="bg-[var(--card-bg)]/50 border border-[var(--accent)]/20 rounded-2xl p-4">
-                <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Online (Last.fm Connected)</p>
-                <p className="text-2xl font-black text-emerald-400 mt-1">{userSummary.lastfmConnected.toLocaleString()}</p>
+                <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Online (Scrobbler Connected)</p>
+                <p className="text-2xl font-black text-emerald-400 mt-1">{userSummary.scrobblerConnected.toLocaleString()}</p>
               </div>
               <div className="bg-[var(--card-bg)]/50 border border-[var(--accent)]/20 rounded-2xl p-4">
-                <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Offline (No Last.fm)</p>
-                <p className="text-2xl font-black text-rose-400 mt-1">{userSummary.lastfmNotConnected.toLocaleString()}</p>
+                <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Offline (No Scrobbler)</p>
+                <p className="text-2xl font-black text-rose-400 mt-1">{userSummary.scrobblerNotConnected.toLocaleString()}</p>
               </div>
             </div>
 
@@ -1502,8 +1510,8 @@ function AdminPanel() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
               <div className="bg-[var(--card-bg)]/50 border border-emerald-400/20 rounded-2xl p-4">
-                <p className="text-[10px] uppercase tracking-widest font-black text-emerald-300">Last.fm Connected Usernames</p>
-                <div className="mt-3 max-h-48 overflow-y-auto pr-1 space-y-1">
+                <p className="text-[10px] uppercase tracking-widest font-black text-emerald-300">Scrobbler Connected Usernames</p>
+                <div className="mt-3 max-h-48 overflow-y-auto no-scrollbar pr-1 space-y-1">
                   {connectedUsernames.length === 0 ? (
                     <p className="text-xs font-semibold text-[var(--text-secondary)]">No connected users found.</p>
                   ) : (
@@ -1516,8 +1524,8 @@ function AdminPanel() {
                 </div>
               </div>
               <div className="bg-[var(--card-bg)]/50 border border-rose-400/20 rounded-2xl p-4">
-                <p className="text-[10px] uppercase tracking-widest font-black text-rose-300">No Last.fm Usernames</p>
-                <div className="mt-3 max-h-48 overflow-y-auto pr-1 space-y-1">
+                <p className="text-[10px] uppercase tracking-widest font-black text-rose-300">No Scrobbler Usernames</p>
+                <div className="mt-3 max-h-48 overflow-y-auto no-scrollbar pr-1 space-y-1">
                   {notConnectedUsernames.length === 0 ? (
                     <p className="text-xs font-semibold text-[var(--text-secondary)]">No offline users found.</p>
                   ) : (
@@ -1526,6 +1534,68 @@ function AdminPanel() {
                         {name}
                       </p>
                     ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+              <div className="bg-[var(--card-bg)]/50 border border-[var(--accent)]/20 rounded-2xl p-4">
+                <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Last.fm Users</p>
+                <div className="mt-3 max-h-56 overflow-y-auto no-scrollbar pr-1 space-y-2">
+                  {userSummary.lastfmUsers?.length ? (
+                    userSummary.lastfmUsers.map((row, idx) => (
+                      <div key={`${row.username}-lastfm-${idx}`} className="rounded-xl border border-[var(--accent)]/15 bg-[var(--bg-primary)]/40 p-3">
+                        <p className="text-sm font-bold text-[var(--text-primary)]">{row.username}</p>
+                        <p className="text-xs text-[var(--text-secondary)] break-all">{row.lastfmUsername}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs font-semibold text-[var(--text-secondary)]">No Last.fm users yet.</p>
+                  )}
+                </div>
+              </div>
+              <div className="bg-[var(--card-bg)]/50 border border-[var(--accent)]/20 rounded-2xl p-4">
+                <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">stats.fm Users</p>
+                <div className="mt-3 max-h-56 overflow-y-auto no-scrollbar pr-1 space-y-2">
+                  {userSummary.statsfmUsers?.length ? (
+                    userSummary.statsfmUsers.map((row, idx) => (
+                      <div key={`${row.username}-statsfm-${idx}`} className="rounded-xl border border-[var(--accent)]/15 bg-[var(--bg-primary)]/40 p-3">
+                        <p className="text-sm font-bold text-[var(--text-primary)]">{row.username}</p>
+                        <a
+                          href={row.scrobblerLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-[var(--accent)] break-all hover:underline"
+                        >
+                          {row.scrobblerLink}
+                        </a>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs font-semibold text-[var(--text-secondary)]">No stats.fm users yet.</p>
+                  )}
+                </div>
+              </div>
+              <div className="bg-[var(--card-bg)]/50 border border-[var(--accent)]/20 rounded-2xl p-4">
+                <p className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Musicat Users</p>
+                <div className="mt-3 max-h-56 overflow-y-auto no-scrollbar pr-1 space-y-2">
+                  {userSummary.musicatUsers?.length ? (
+                    userSummary.musicatUsers.map((row, idx) => (
+                      <div key={`${row.username}-musicat-${idx}`} className="rounded-xl border border-[var(--accent)]/15 bg-[var(--bg-primary)]/40 p-3">
+                        <p className="text-sm font-bold text-[var(--text-primary)]">{row.username}</p>
+                        <a
+                          href={row.scrobblerLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-[var(--accent)] break-all hover:underline"
+                        >
+                          {row.scrobblerLink}
+                        </a>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs font-semibold text-[var(--text-secondary)]">No Musicat users yet.</p>
                   )}
                 </div>
               </div>
