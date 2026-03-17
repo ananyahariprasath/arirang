@@ -315,7 +315,7 @@ function AuthPage() {
                 type="text"
                 value={referralCode}
                 onChange={(e) => setReferralCode(e.target.value)}
-                placeholder="Referral code (optional)"
+                placeholder="Who referred you? (optional)"
                 className="w-full px-5 py-4 rounded-2xl bg-[var(--bg-primary)]/50 border border-[var(--accent)]/30 focus:border-[var(--accent)] outline-none transition-colors text-[var(--text-primary)] placeholder:text-[var(--text-primary)]/50 text-lg shadow-inner"
               />
             </div>
