@@ -1,4 +1,4 @@
-import { getDb } from "../../lib/mongodb.js";
+import { getDb } from "../lib/mongodb.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import nodemailer from "nodemailer";
