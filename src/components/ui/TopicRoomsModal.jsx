@@ -4,7 +4,6 @@ import { useToast } from "../../context/ToastContext";
 import ConfirmModal from "../modals/ConfirmModal";
 
 const DEFAULT_COVER = "/assets/images/bts-un-photo-1.jpg";
-const TOPIC_ROOMS_EXITED_KEY_PREFIX = "topic_rooms_exited_v1_";
 const TOPIC_ROOMS_READS_KEY_PREFIX = "topic_rooms_reads_v1_";
 const TOPIC_ROOMS_UNREAD_KEY_PREFIX = "topic_rooms_unread_total_v1_";
 
@@ -76,7 +75,6 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
   const [messageImageName, setMessageImageName] = useState("");
   const [replyToMessage, setReplyToMessage] = useState(null);
   const [adminExpiryAt, setAdminExpiryAt] = useState("");
-  const [exitedRoomIds, setExitedRoomIds] = useState([]);
   const [roomReadMap, setRoomReadMap] = useState({});
   const [storageReady, setStorageReady] = useState(false);
   const [exitConfirmRoomId, setExitConfirmRoomId] = useState("");
@@ -91,7 +89,6 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
   const isAdmin = String(user?.role || "").toLowerCase() === "admin";
   const currentUserAvatar = String(user?.profilePicture || "");
   const currentUserRoomIdentity = currentUserIdentity || toIdentity(currentUserLabel);
-  const exitedStorageKey = `${TOPIC_ROOMS_EXITED_KEY_PREFIX}${currentUserRoomIdentity || "guest"}`;
   const readsStorageKey = `${TOPIC_ROOMS_READS_KEY_PREFIX}${currentUserRoomIdentity || "guest"}`;
   const unreadStorageKey = `${TOPIC_ROOMS_UNREAD_KEY_PREFIX}${currentUserRoomIdentity || "guest"}`;
 
@@ -173,20 +170,6 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
 
   useEffect(() => {
     try {
-      const rawExited = localStorage.getItem(exitedStorageKey);
-      if (rawExited) {
-        const parsed = JSON.parse(rawExited);
-        setExitedRoomIds(Array.isArray(parsed) ? parsed : []);
-      } else {
-        setExitedRoomIds([]);
-      }
-    } catch {
-      setExitedRoomIds([]);
-    }
-  }, [exitedStorageKey]);
-
-  useEffect(() => {
-    try {
       const rawReads = localStorage.getItem(readsStorageKey);
       if (rawReads) {
         const parsed = JSON.parse(rawReads);
@@ -198,15 +181,6 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
       setRoomReadMap({});
     }
   }, [readsStorageKey]);
-
-  useEffect(() => {
-    if (!storageReady) return;
-    try {
-      localStorage.setItem(exitedStorageKey, JSON.stringify(exitedRoomIds));
-    } catch {
-      // Best-effort persistence.
-    }
-  }, [exitedRoomIds, exitedStorageKey, storageReady]);
 
   useEffect(() => {
     if (!storageReady) return;
@@ -253,13 +227,7 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
     () => activeRooms.find((room) => toIdentity(room.createdByIdentity) === currentUserRoomIdentity) || null,
     [activeRooms, currentUserRoomIdentity]
   );
-  const visibleActiveRooms = useMemo(
-    () =>
-      activeRooms.filter((room) =>
-        !exitedRoomIds.includes(room.id) || isUserInRoom(room) || isCreatorOfRoom(room)
-      ),
-    [activeRooms, exitedRoomIds, currentUserRoomIdentity]
-  );
+  const visibleActiveRooms = useMemo(() => activeRooms, [activeRooms]);
 
   const canCreateRoom = isAdmin || (activeRooms.length < config.maxActiveRooms && !currentUserCreatedActiveRoom);
   const selectedRoom = useMemo(
@@ -411,7 +379,6 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
         },
       }));
     }
-    setExitedRoomIds((prev) => prev.filter((id) => id !== roomId));
     setSelectedRoomId(roomId);
     setView("room");
     markRoomAsRead(roomId);
@@ -430,7 +397,6 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
     }));
     setSelectedRoomId("");
     setView("landing");
-    setExitedRoomIds((prev) => (prev.includes(roomId) ? prev : [...prev, roomId]));
     toast.show("You exited the room.", "success");
   };
 
@@ -439,7 +405,6 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
     const room = rooms.find((r) => r.id === roomId);
     if (!room) return;
     setRooms((prev) => prev.filter((r) => r.id !== roomId));
-    setExitedRoomIds((prev) => prev.filter((id) => id !== roomId));
     if (selectedRoomId === roomId) {
       setSelectedRoomId("");
       setView("landing");
@@ -477,7 +442,6 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
     }));
     setSelectedRoomId("");
     setView("landing");
-    setExitedRoomIds((prev) => (prev.includes(room.id) ? prev : [...prev, room.id]));
     toast.show("Room deleted and you exited.", "success");
     closeExitPrompt();
   };
@@ -503,7 +467,6 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
     }));
     setSelectedRoomId("");
     setView("landing");
-    setExitedRoomIds((prev) => (prev.includes(room.id) ? prev : [...prev, room.id]));
     toast.show("Ownership transferred and you exited.", "success");
     closeExitPrompt();
   };
@@ -854,7 +817,7 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
                                     {getRoomUnreadCount(room)}
                                   </span>
                                 ) : null}
-                                <span className="text-[10px] font-black uppercase tracking-widest text-amber-300">Expires in {formatTimeLeft(room.expiresAt - nowMs)}</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--accent)]">Expires in {formatTimeLeft(room.expiresAt - nowMs)}</span>
                               </div>
                             </div>
                             <p className="mt-1 text-xs font-semibold text-[var(--text-secondary)]">
