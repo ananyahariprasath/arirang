@@ -215,7 +215,7 @@ function AuthPage() {
             </div>
             {error && <p className="text-red-400 text-sm mt-2 ml-1">{error}</p>}
             <button type="submit" disabled={loading} className="w-full px-5 py-4 rounded-2xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/80 transition-all font-bold tracking-wider text-lg shadow-lg shadow-[var(--accent)]/20 hover:-translate-y-1">
-              {loading ? "Logging in..." : "Login"}
+              {loading ? "Just a moment..." : "Login"}
             </button>
             <div className="text-center mt-6">
               <span className="text-[var(--text-secondary)]">Don't have an account? </span>
@@ -299,7 +299,7 @@ function AuthPage() {
             </div>
             {error && <p className="text-red-400 text-sm mt-2 ml-1">{error}</p>}
             <button type="submit" disabled={loading} className="w-full px-5 py-4 rounded-2xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/80 transition-all font-bold tracking-wider text-lg shadow-lg shadow-[var(--accent)]/20 hover:-translate-y-1">
-              {loading ? "Signing up..." : "Sign Up"}
+              {loading ? "Signing you up..." : "Sign Up"}
             </button>
             <div className="text-center mt-6">
               <span className="text-[var(--text-secondary)]">Already have an account? </span>

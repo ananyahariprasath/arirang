@@ -171,7 +171,7 @@ function AuthModal({ isOpen, onClose }) {
             </div>
             {error && <p className="text-red-400 text-sm mt-2 ml-1">{error}</p>}
             <button type="submit" disabled={loading} className="w-full px-4 py-3 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/80 transition-colors font-semibold shadow-lg shadow-[var(--accent)]/20">
-              {loading ? "Logging in..." : "Login"}
+              {loading ? "Just a moment..." : "Login"}
             </button>
             <div className="text-center mt-4">
               <span className="text-[var(--text-secondary)] text-sm">Don't have an account? </span>
@@ -196,7 +196,7 @@ function AuthModal({ isOpen, onClose }) {
             </p>
             {error && <p className="text-red-400 text-sm mt-2 ml-1">{error}</p>}
             <button type="submit" disabled={loading} className="w-full px-4 py-3 rounded-xl bg-[var(--accent)] text-white hover:bg-[var(--accent)]/80 transition-colors font-semibold shadow-lg shadow-[var(--accent)]/20">
-              {loading ? "Signing up..." : "Sign Up"}
+              {loading ? "Signing you up..." : "Sign Up"}
             </button>
             <div className="text-center mt-4">
               <span className="text-[var(--text-secondary)] text-sm">Already have an account? </span>
