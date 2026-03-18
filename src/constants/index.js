@@ -118,7 +118,8 @@ export const COUNTRY_PRESETS = {
   "Portugal": { tz: "Europe/Lisbon", s: "12:00 AM WET / 1:00 AM WEST" },
   "Puerto Rico": { tz: "America/Puerto_Rico", s: "8:00 PM AST" },
   "Qatar": { tz: "Asia/Qatar", s: "3:00 AM AST" },
-  "Reunion": { tz: "Indian/Reunion", s: "4:00 AM RET" },
+  "Reunion Island": { tz: "Indian/Reunion", s: "4:00 AM RET" },
+  "Reunion": { tz: "Indian/Reunion", s: "4:00 AM RET" }, // backward compatibility
   "Romania": { tz: "Europe/Bucharest", s: "2:00 AM EET / 3:00 AM EEST" },
   "San Marino": { tz: "Europe/San_Marino", s: "1:00 AM CET / 2:00 AM CEST" },
   "Russia": { tz: "Europe/Moscow", s: "3:00 AM MSK" }, // note: multiple zones
@@ -309,7 +310,8 @@ export const COUNTRY_REGION_MAP = {
   "Portugal": "Europe",
   "Puerto Rico": "Caribbean",
   "Qatar": "West Asia",
-  "Reunion": "Africa",
+  "Reunion Island": "Africa",
+  "Reunion": "Africa", // backward compatibility
   "Republic of the Congo": "Africa",
   "Romania": "Europe",
   "Russia": "North Asia",
@@ -519,7 +521,8 @@ export const COUNTRY_TZ_MAP = {
   "Portugal": "Europe/Lisbon",
   "Puerto Rico": "America/Puerto_Rico",
   "Qatar": "Asia/Qatar",
-  "Reunion": "Indian/Reunion",
+  "Reunion Island": "Indian/Reunion",
+  "Reunion": "Indian/Reunion", // backward compatibility
   "Republic of the Congo": "Africa/Brazzaville",
   "Romania": "Europe/Bucharest",
   "Russia": "Europe/Moscow",
@@ -579,24 +582,24 @@ export const COUNTRY_TZ_MAP = {
 
 export const COUNTRIES = [
   "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Antigua and Barbuda", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan",
-  "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Bermuda", "Belize", "Benin", "Bhutan", "Bolivia",
+  "Bahamas", "Bahrain", "Bangladesh", "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bhutan", "Bolivia",
   "Bosnia and Herzegovina", "Botswana", "Brazil", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cabo Verde", "Cambodia", "Cameroon",
-  "Canada", "Central African Republic", "Cayman Islands", "Chad", "Chile", "China", "Colombia", "Comoros", "Costa Rica", "Croatia", "Cuba",
+  "Canada", "Central African Republic", "Chad", "Chile", "China", "Colombia", "Comoros", "Costa Rica", "Croatia", "Cuba",
   "Cyprus", "Czech Republic", "Democratic Republic of the Congo", "Denmark", "Djibouti", "Dominica", "Dominican Republic", "Ecuador", "Egypt", "El Salvador",
-  "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "French Polynesia", "Gabon", "Gambia",
-  "Georgia", "Germany", "Ghana", "Greece", "Greenland", "Grenada", "Guam", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana",
+  "Equatorial Guinea", "Eritrea", "Estonia", "Eswatini", "Ethiopia", "Fiji", "Finland", "France", "Gabon", "Gambia",
+  "Georgia", "Germany", "Ghana", "Greece", "Greenland", "Grenada", "Guatemala", "Guinea", "Guinea-Bissau", "Guyana",
   "Haiti", "Honduras", "Hong Kong", "Hungary", "Iceland", "India", "Indonesia", "Iran", "Iraq", "Ireland", "Israel",
   "Italy", "Ivory Coast", "Jamaica", "Japan", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Kuwait", "Kyrgyzstan",
   "Laos", "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Lithuania", "Liechtenstein", "Luxembourg", "Madagascar", "Malawi",
-  "Malaysia", "Maldives", "Macau", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Monaco", "Mayotte", "Mexico", "Micronesia", "Moldova", "Mongolia",
-  "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "New Caledonia", "Netherlands", "New Zealand", "Nicaragua",
+  "Malaysia", "Maldives", "Macau", "Mali", "Malta", "Marshall Islands", "Mauritania", "Mauritius", "Monaco", "Mexico", "Micronesia", "Moldova", "Mongolia",
+  "Montenegro", "Morocco", "Mozambique", "Myanmar", "Namibia", "Nauru", "Nepal", "Netherlands", "New Zealand", "Nicaragua",
   "Niger", "Nigeria", "North Korea", "North Macedonia", "Norway", "Oman", "Pakistan", "Palau", "Palestine", "Panama",
-  "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Puerto Rico", "Qatar", "Reunion", "Republic of the Congo", "Romania", "Russia", "San Marino",
+  "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Poland", "Portugal", "Puerto Rico", "Qatar", "Reunion Island", "Republic of the Congo", "Romania", "Russia", "San Marino",
   "Rwanda", "Saint Kitts and Nevis", "Saint Lucia", "Saint Vincent and the Grenadines", "Samoa", "São Tomé and Príncipe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles",
   "Sierra Leone", "Singapore", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa", "South Korea", "South Sudan", "Spain",
   "Sri Lanka", "Sudan", "Suriname", "Sweden", "Switzerland", "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand",
   "Timor-Leste", "Togo", "Tonga", "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Tuvalu", "Uganda", "Ukraine",
-  "United Arab Emirates", "United Kingdom", "United States", "USA", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia",
+  "United Arab Emirates", "United Kingdom", "United States", "Uruguay", "Uzbekistan", "Vanuatu", "Vatican City", "Venezuela", "Vietnam", "Yemen", "Zambia",
   "Zimbabwe"
 ];
 
@@ -684,7 +687,7 @@ export const DEFAULT_DAILY_MISSIONS = [
   {
     id: "mission-4",
     title: "Join the fan action",
-    description: "Complete today’s fan action or challenge.",
+    description: "Complete today's fan action or challenge.",
     type: "engagement",
     target: 1,
     unit: "actions",
@@ -717,7 +720,7 @@ export const INITIAL_REGIONS = [
     gFormUrl: "https://forms.gle/india_stream_proof"
   },
   {
-    country: "USA",
+    country: "United States",
     region: "North America",
     goal: "Top 10 on Billboard Hot 100 and 10M streams.",
     tz: "America/New_York",
@@ -791,3 +794,4 @@ export const COUNTRY_MULTI_TZ_MAP = {
 // URL for live global updates (e.g., a GitHub Gist raw URL)
 // If empty, the app will use local data.json and localStorage
 export const DATA_SOURCE_URL = "https://gist.githubusercontent.com/ananyahariprasath/df1b0b42e90f29c96bc43b59167dbe8a/raw/arirang-data.json"; 
+

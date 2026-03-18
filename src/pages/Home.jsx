@@ -30,11 +30,12 @@ import useDailyUpdates from "../hooks/useDailyUpdates";
 const COUNTRY_PLACEHOLDER = "Select your Country";
 
 const COUNTRY_ALIASES = {
-  "united states": "USA",
-  "united states of america": "USA",
-  us: "USA",
-  "u.s.": "USA",
-  "u.s.a.": "USA",
+  "united states": "United States",
+  "united states of america": "United States",
+  usa: "United States",
+  us: "United States",
+  "u.s.": "United States",
+  "u.s.a.": "United States",
 };
 
 function resolveCountryFromUser(user) {

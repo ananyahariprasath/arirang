@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+﻿import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import Header from "../components/layout/Header";
 import useBattles from "../hooks/useBattles";
 import useTimeline from "../hooks/useTimeline";
@@ -44,6 +44,17 @@ const MISSION_TYPE_DEFAULT_UNITS = {
   engagement: "actions",
   custom: "actions"
 };
+
+function clonePlaylists(playlists = FOCUS_PLAYLISTS) {
+  return {
+    spotify: Array.isArray(playlists?.spotify)
+      ? playlists.spotify.map((pl) => ({ name: String(pl?.name || ""), url: String(pl?.url || "") }))
+      : [],
+    appleMusic: Array.isArray(playlists?.appleMusic)
+      ? playlists.appleMusic.map((pl) => ({ name: String(pl?.name || ""), url: String(pl?.url || "") }))
+      : [],
+  };
+}
 
 function AdminViewPanel() {
   const [submissions, setSubmissions] = useState([]);
@@ -414,19 +425,19 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
     tz: "",
     spotifyReset: "",
     appleReset: "",
-    playlists: FOCUS_PLAYLISTS,
+    playlists: clonePlaylists(),
     gFormUrl: ""
   });
 
-  const [playlistPlatform, setPlaylistPlatform] = useState("spotify");
   const [selectedCountries, setSelectedCountries] = useState([]);
 
   const [countrySearch, setCountrySearch] = useState("");
-  const [showCountryDrop, setShowCountryDrop] = useState(false);
 
   const [newGalleryImage, setNewGalleryImage] = useState({ src: "", type: "square" });
   const [editingGallerySrc, setEditingGallerySrc] = useState(null);
   const [editingGalleryType, setEditingGalleryType] = useState("");
+  const [editingRegionCountry, setEditingRegionCountry] = useState("");
+  const [regionListSearch, setRegionListSearch] = useState("");
   const [topicRoomStatus, setTopicRoomStatus] = useState("active");
   const [topicRoomClosedMeta, setTopicRoomClosedMeta] = useState(null);
   const [editingBattleId, setEditingBattleId] = useState(null);
@@ -471,6 +482,20 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
     }
     return sorted;
   }, [luckyDrawEntries, luckyDrawFilter, luckyDrawSort]);
+
+  const filteredCountryOptions = useMemo(
+    () => COUNTRIES.filter((c) => c.toLowerCase().includes(countrySearch.toLowerCase())),
+    [countrySearch]
+  );
+
+  const filteredRegionEntries = useMemo(() => {
+    const term = String(regionListSearch || "").trim().toLowerCase();
+    if (!term) return regions;
+    return regions.filter((r) =>
+      [r.country, r.region, r.goal]
+        .some((field) => String(field || "").toLowerCase().includes(term))
+    );
+  }, [regions, regionListSearch]);
 
   useEffect(() => {
     let active = true;
@@ -559,7 +584,8 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
     const tz = String(newRegion.tz || "").trim();
     const gFormUrl = String(newRegion.gFormUrl || "").trim();
 
-    if (selectedCountries.length === 0) {
+    const effectiveCountryCount = editingRegionCountry ? 1 : selectedCountries.length;
+    if (effectiveCountryCount === 0) {
       blocking.push("Select at least one country.");
     }
     if (!region) blocking.push("Region is required.");
@@ -581,7 +607,7 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
     }
 
     return { blocking, hints, isValid: blocking.length === 0 };
-  }, [newRegion, selectedCountries]);
+  }, [newRegion, selectedCountries, editingRegionCountry]);
 
   const overallHealthStatus = useMemo(() => {
     const entries = Object.values(healthChecks || {});
@@ -799,14 +825,15 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
     setNewEvent({ date: "", time: "", platform: "Spotify", event: "" });
   };
 
-  const handleAddRegion = (e) => {
+    const handleAddRegion = (e) => {
     e.preventDefault();
-    if (selectedCountries.length === 0 || !newRegion.region || !newRegion.goal) {
+    const targetCountries = editingRegionCountry ? [editingRegionCountry] : selectedCountries;
+    if (targetCountries.length === 0 || !newRegion.region || !newRegion.goal) {
       toast.show("Please fill necessary fields (Country, Region, Goal)", "error");
       return;
     }
 
-    selectedCountries.forEach((country) => {
+    targetCountries.forEach((country) => {
       const region = COUNTRY_REGION_MAP[country] || newRegion.region;
       const tz = COUNTRY_TZ_MAP[country] || newRegion.tz;
       addRegion({
@@ -814,26 +841,59 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
         country,
         region,
         tz,
+        playlists: clonePlaylists(newRegion.playlists),
       });
     });
-    
-    // Reset Form
-    setNewRegion({ 
-      country: "", 
-      region: "", 
-      goal: "", 
-      tz: "", 
-      spotifyReset: "", 
-      appleReset: "", 
-      playlists: FOCUS_PLAYLISTS, 
-      gFormUrl: "" 
+
+    setNewRegion({
+      country: "",
+      region: "",
+      goal: "",
+      tz: "",
+      spotifyReset: "",
+      appleReset: "",
+      playlists: clonePlaylists(),
+      gFormUrl: "",
     });
+    setEditingRegionCountry("");
     setCountrySearch("");
-    setShowCountryDrop(false);
     setSelectedCountries([]);
-    toast.show(`Regional info saved for ${selectedCountries.length} countr${selectedCountries.length === 1 ? "y" : "ies"}! 💜`, "success");
+    toast.show(`Regional info saved for ${targetCountries.length} countr${targetCountries.length === 1 ? "y" : "ies"}!`, "success");
   };
 
+
+  const handleEditRegion = (regionItem) => {
+    if (!regionItem?.country) return;
+    setEditingRegionCountry(regionItem.country);
+    setSelectedCountries([regionItem.country]);
+    setCountrySearch("");
+    setNewRegion({
+      country: String(regionItem.country || ""),
+      region: String(regionItem.region || ""),
+      goal: String(regionItem.goal || ""),
+      tz: String(regionItem.tz || ""),
+      spotifyReset: String(regionItem.spotifyReset || ""),
+      appleReset: String(regionItem.appleReset || ""),
+      playlists: clonePlaylists(regionItem.playlists),
+      gFormUrl: String(regionItem.gFormUrl || ""),
+    });
+  };
+
+  const handleCancelRegionEdit = () => {
+    setEditingRegionCountry("");
+    setSelectedCountries([]);
+    setCountrySearch("");
+    setNewRegion({
+      country: "",
+      region: "",
+      goal: "",
+      tz: "",
+      spotifyReset: "",
+      appleReset: "",
+      playlists: clonePlaylists(),
+      gFormUrl: "",
+    });
+  };
   const handleAddGalleryImage = (e) => {
     e.preventDefault();
     if (!newGalleryImage.src || !newGalleryImage.type) {
@@ -849,7 +909,7 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
 
     addGalleryImage(newGalleryImage);
     setNewGalleryImage({ src: "", type: "square" });
-    toast.show("Image added to gallery pool! 💜", "success");
+    toast.show("Image added to gallery pool! ðŸ’œ", "success");
   };
 
   const applyMissionTypeDefaults = useCallback((type, prev) => {
@@ -937,9 +997,14 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
   };
 
   const updatePlaylistField = (platform, index, field, value) => {
-    const updatedPlaylists = { ...newRegion.playlists };
-    updatedPlaylists[platform][index] = { ...updatedPlaylists[platform][index], [field]: value };
-    setNewRegion({ ...newRegion, playlists: updatedPlaylists });
+    setNewRegion((prev) => {
+      const nextPlaylists = clonePlaylists(prev.playlists);
+      const platformList = Array.isArray(nextPlaylists[platform]) ? nextPlaylists[platform] : [];
+      if (!platformList[index]) platformList[index] = { name: "", url: "" };
+      platformList[index] = { ...platformList[index], [field]: value };
+      nextPlaylists[platform] = platformList;
+      return { ...prev, playlists: nextPlaylists };
+    });
   };
 
   const handlePresetChange = (val) => {
@@ -957,33 +1022,30 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
     }
   };
 
-  const handleCountrySelect = (country) => {
-    if (!country || selectedCountries.includes(country)) {
-      setCountrySearch("");
-      setShowCountryDrop(false);
-      return;
-    }
-    const region = COUNTRY_REGION_MAP[country] || "";
-    // Priority: Specific country preset -> General region preset (mapped) -> Current state
-    const preset = COUNTRY_PRESETS[country] || (region ? COUNTRY_PRESETS[region] : null);
-    const countryTz = COUNTRY_TZ_MAP[country];
-    const nextCountries = [...selectedCountries, country];
+  const handleCountryToggle = (country, checked) => {
+    if (!country) return;
+    if (editingRegionCountry && country !== editingRegionCountry) return;
+    const nextCountries = checked
+      ? Array.from(new Set([...selectedCountries, country]))
+      : selectedCountries.filter((c) => c !== country);
     const nextRegions = Array.from(
       new Set(nextCountries.map((c) => COUNTRY_REGION_MAP[c] || "").filter(Boolean))
     );
     const autoRegion = nextRegions.length === 1 ? nextRegions[0] : "Multiple Regions";
-    
-    setNewRegion({
-      ...newRegion,
-      country,
-      region: autoRegion || newRegion.region || region,
-      tz: newRegion.tz || countryTz || (preset ? preset.tz : newRegion.tz),
-      spotifyReset: newRegion.spotifyReset || (preset ? preset.s : newRegion.spotifyReset),
-      appleReset: newRegion.appleReset || (preset ? preset.a : newRegion.appleReset)
-    });
-    setSelectedCountries((prev) => [...prev, country]);
-    setCountrySearch("");
-    setShowCountryDrop(false);
+    const firstCountry = nextCountries[0] || "";
+    const firstRegion = firstCountry ? (COUNTRY_REGION_MAP[firstCountry] || "") : "";
+    const preset = firstCountry ? (COUNTRY_PRESETS[firstCountry] || (firstRegion ? COUNTRY_PRESETS[firstRegion] : null)) : null;
+    const countryTz = firstCountry ? COUNTRY_TZ_MAP[firstCountry] : "";
+
+    setNewRegion((prev) => ({
+      ...prev,
+      country: firstCountry,
+      region: nextCountries.length ? (autoRegion || prev.region || firstRegion) : "",
+      tz: nextCountries.length ? (prev.tz || countryTz || (preset ? preset.tz : prev.tz)) : "",
+      spotifyReset: nextCountries.length ? (prev.spotifyReset || (preset ? preset.s : prev.spotifyReset)) : "",
+      appleReset: nextCountries.length ? (prev.appleReset || (preset ? preset.a : prev.appleReset)) : "",
+    }));
+    setSelectedCountries(nextCountries);
   };
 
   const handleSyncNow = async () => {
@@ -1933,7 +1995,7 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
               )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-8">
+            <div className="grid grid-cols-1 gap-8">
               
               {/* List of Battles */}
               <div>
@@ -2004,7 +2066,7 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
                             <input type="text" value={editingBattle.winner || ""} onChange={e => setEditingBattle({...editingBattle, winner: e.target.value})} placeholder="e.g. SOUTH ASIA" className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30" />
                           </div>
                           <div className="flex gap-2 pt-1">
-                            <button onClick={() => { updateBattle(battle.id, editingBattle); setEditingBattleId(null); toast.show("Battle record updated! 💜", "success"); }} className="flex-1 bg-[var(--accent)] text-black font-black py-2 rounded-xl text-xs hover:scale-[1.02] active:scale-95 transition-all">Save Changes</button>
+                            <button onClick={() => { updateBattle(battle.id, editingBattle); setEditingBattleId(null); toast.show("Battle record updated! ðŸ’œ", "success"); }} className="flex-1 bg-[var(--accent)] text-black font-black py-2 rounded-xl text-xs hover:scale-[1.02] active:scale-95 transition-all">Save Changes</button>
                             <button onClick={() => setEditingBattleId(null)} className="px-4 py-2 rounded-xl text-xs font-bold border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all">Cancel</button>
                           </div>
                         </div>
@@ -2059,7 +2121,7 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
               {/* Right Sidebar: Editors */}
               <div className="flex flex-col gap-8 h-fit lg:sticky lg:top-12">
                 
-                {/* 1. Live Battles Editor — one card per battle */}
+                {/* 1. Live Battles Editor â€” one card per battle */}
                 <div className="flex justify-between items-center mb-1">
                   <h2 className="text-xl font-black uppercase tracking-tighter text-[var(--accent)]">Live Battles Editor</h2>
                   <button 
@@ -2436,7 +2498,7 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
                       disabled={!battleValidation.isValid}
                       className="w-full bg-[var(--accent)] text-black dark:text-black font-black py-3 rounded-xl text-xs hover:scale-[1.02] active:scale-[0.98] transition-all mt-2 shadow-lg shadow-[var(--accent)]/20 uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:active:scale-100"
                     >
-                      Add to History 💜
+                      Add to History ðŸ’œ
                     </button>
                   </form>
                 </div>
@@ -2488,7 +2550,7 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
                             <textarea value={editingEvent.event} onChange={e => setEditingEvent({...editingEvent, event: e.target.value})} className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-2.5 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all h-20 resize-none text-[var(--text-primary)]" />
                           </div>
                           <div className="flex gap-2 pt-1">
-                            <button onClick={() => { updateEvent(ev.id, editingEvent); setEditingEventId(null); toast.show("Timeline event updated! 💜", "success"); }} className="flex-1 bg-[var(--accent)] text-black font-black py-2 rounded-xl text-xs hover:scale-[1.02] active:scale-95 transition-all">Save Changes</button>
+                            <button onClick={() => { updateEvent(ev.id, editingEvent); setEditingEventId(null); toast.show("Timeline event updated! ðŸ’œ", "success"); }} className="flex-1 bg-[var(--accent)] text-black font-black py-2 rounded-xl text-xs hover:scale-[1.02] active:scale-95 transition-all">Save Changes</button>
                             <button onClick={() => setEditingEventId(null)} className="px-4 py-2 rounded-xl text-xs font-bold border border-[var(--accent)]/20 hover:bg-[var(--accent)]/10 transition-all">Cancel</button>
                           </div>
                         </div>
@@ -2587,17 +2649,28 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
               {/* Region List */}
               <div>
                 <div className="flex justify-between items-center mb-8">
-                  <h2 className="text-2xl font-bold">Regional Streaming Info ({regions.length})</h2>
+                  <div className="flex-1">
+                    <h2 className="text-2xl font-bold">
+                      Regional Streaming Info ({filteredRegionEntries.length}{filteredRegionEntries.length !== regions.length ? ` / ${regions.length}` : ""})
+                    </h2>
+                    <input
+                      type="text"
+                      value={regionListSearch}
+                      onChange={(e) => setRegionListSearch(e.target.value)}
+                      placeholder="Search country, region, or goal..."
+                      className="mt-3 w-full max-w-md bg-[var(--bg-primary)]/60 border border-[var(--accent)]/20 px-3 py-2 rounded-xl text-xs font-semibold outline-none focus:border-[var(--accent)]"
+                    />
+                  </div>
                   <button 
                     onClick={() => { if(confirm("Reset regional data?")) resetRegions() }}
-                    className="text-xs font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest"
+                    className="text-xs font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-widest ml-4"
                   >
                     Reset to Default
                   </button>
                 </div>
 
                 <div className="space-y-4">
-                  {regions.map((r) => (
+                  {filteredRegionEntries.map((r) => (
                     <div key={r.country} className="bg-[var(--card-bg)]/40 p-6 rounded-3xl border border-[var(--accent)]/20 group">
                       <div className="flex justify-between items-start mb-4">
                         <div>
@@ -2607,12 +2680,23 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
                           </div>
                           <p className="text-xs font-bold text-[var(--text-primary)] opacity-50 uppercase tracking-wide">{r.goal}</p>
                         </div>
-                        <button 
-                          onClick={() => deleteRegion(r.country)}
-                          className="p-2 text-red-500 sm:opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEditRegion(r)}
+                            className="px-2.5 py-1.5 rounded-lg border border-[var(--accent)]/30 text-[var(--accent)] text-[10px] font-black uppercase tracking-widest hover:bg-[var(--accent)]/10 transition-all"
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            onClick={() => {
+                              if (editingRegionCountry === r.country) handleCancelRegionEdit();
+                              deleteRegion(r.country);
+                            }}
+                            className="p-2 text-red-500 sm:opacity-0 group-hover:opacity-100 transition-all"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                          </button>
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-6">
@@ -2647,64 +2731,88 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
                       </div>
                     </div>
                   ))}
+                  {filteredRegionEntries.length === 0 ? (
+                    <div className="rounded-2xl border border-[var(--accent)]/15 bg-[var(--bg-primary)]/40 px-4 py-6 text-sm font-semibold text-[var(--text-secondary)]">
+                      No regional entries matched your search.
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
               {/* Add Region Form */}
-              <div className="bg-[var(--card-bg)]/80 backdrop-blur-2xl p-6 rounded-3xl border border-[var(--accent)]/40 shadow-xl h-fit lg:sticky lg:top-12">
-                <h3 className="text-lg font-black mb-6 uppercase tracking-tight text-[var(--accent)]">Record Regional Info</h3>
+              <div className="bg-[var(--card-bg)]/80 backdrop-blur-2xl p-6 rounded-3xl border border-[var(--accent)]/40 shadow-xl">
+                <h3 className="text-lg font-black mb-6 uppercase tracking-tight text-[var(--accent)]">
+                  {editingRegionCountry ? `Edit Regional Info - ${editingRegionCountry}` : "Record Regional Info"}
+                </h3>
+                {editingRegionCountry ? (
+                  <div className="mb-4 rounded-xl border border-amber-300/30 bg-amber-500/10 px-3 py-2">
+                    <p className="text-[10px] font-black uppercase tracking-wide text-amber-200">
+                      Editing one country only. Save will update only {editingRegionCountry}.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleCancelRegionEdit}
+                      className="mt-2 text-[10px] font-black uppercase tracking-widest text-amber-100 hover:text-white"
+                    >
+                      Cancel Edit
+                    </button>
+                  </div>
+                ) : null}
                 <form onSubmit={handleAddRegion} className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="relative">
-                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Country</label>
+                      <label className="text-[9px] font-black uppercase text-[var(--text-secondary)] ml-1">Countries</label>
                       <input 
                         type="text" 
                         placeholder="Search country..."
                         value={countrySearch}
-                        onFocus={() => setShowCountryDrop(true)}
-                        onChange={(e) => {
-                          setCountrySearch(e.target.value);
-                          setShowCountryDrop(true);
-                        }}
+                        onChange={(e) => setCountrySearch(e.target.value)}
                         className="w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
                       />
-                      {showCountryDrop && (
-                        <div className="absolute top-full left-0 w-full mt-1 bg-[var(--card-bg)]/90 backdrop-blur-xl border border-[var(--accent)]/40 rounded-xl max-h-40 overflow-y-auto z-[60] shadow-2xl">
-                          {COUNTRIES.filter(c => c.toLowerCase().includes(countrySearch.toLowerCase())).map(c => (
-                            <button
-                              key={c}
-                              type="button"
-                              onClick={() => handleCountrySelect(c)}
-                              className="w-full text-left px-4 py-2 text-xs hover:bg-[var(--accent)] hover:text-black transition-all text-[var(--text-primary)]"
-                            >
-                              {c}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      <div className="mt-2 border border-[var(--accent)]/20 rounded-xl bg-[var(--bg-primary)]/40 max-h-72 overflow-y-auto no-scrollbar">
+                        {filteredCountryOptions.map((c) => (
+                          <label key={c} className="flex items-center gap-2 px-3 py-2 text-xs font-semibold hover:bg-[var(--accent)]/10 transition-all cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selectedCountries.includes(c)}
+                              onChange={(e) => handleCountryToggle(c, e.target.checked)}
+                              disabled={Boolean(editingRegionCountry)}
+                              className="accent-[var(--accent)]"
+                            />
+                            <span>{c}</span>
+                          </label>
+                        ))}
+                        {filteredCountryOptions.length === 0 ? (
+                          <p className="px-3 py-2 text-xs font-semibold text-[var(--text-secondary)]">No countries found.</p>
+                        ) : null}
+                      </div>
                       {selectedCountries.length > 0 ? (
                         <div className="mt-2 flex flex-wrap gap-2">
                           {selectedCountries.map((c) => (
                             <span key={c} className="inline-flex items-center gap-2 rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-[var(--accent)]">
                               {c}
-                              <button
-                                type="button"
-                                onClick={() => setSelectedCountries((prev) => prev.filter((x) => x !== c))}
-                                className="text-[12px] leading-none opacity-60 hover:opacity-100"
-                                aria-label={`Remove ${c}`}
-                                title={`Remove ${c}`}
-                              >
-                                ×
-                              </button>
+                              {!editingRegionCountry ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCountryToggle(c, false)}
+                                  className="text-[12px] leading-none opacity-60 hover:opacity-100"
+                                  aria-label={`Remove ${c}`}
+                                  title={`Remove ${c}`}
+                                >
+                                  x
+                                </button>
+                              ) : null}
                             </span>
                           ))}
-                          <button
-                            type="button"
-                            onClick={() => setSelectedCountries([])}
-                            className="text-[10px] font-black uppercase tracking-widest text-red-300 hover:text-red-200"
-                          >
-                            Clear all
-                          </button>
+                          {!editingRegionCountry ? (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCountries([])}
+                              className="text-[10px] font-black uppercase tracking-widest text-red-300 hover:text-red-200"
+                            >
+                              Clear all
+                            </button>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
@@ -2782,7 +2890,7 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
                       </div>
                     </div>
 
-                    <div className="bg-[var(--bg-primary)]/50 p-4 rounded-2xl border border-[var(--accent)]/10 max-h-[300px] overflow-y-auto custom-scrollbar shadow-inner">
+                    <div className="bg-[var(--bg-primary)]/50 p-4 rounded-2xl border border-[var(--accent)]/10 shadow-inner">
                       <div className="grid grid-cols-1 gap-3">
                         {(newRegion.playlists.spotify || []).map((pl, idx) => (
                           <div key={idx} className="bg-[var(--card-bg)]/40 p-3.5 rounded-xl space-y-2.5 border border-[var(--accent)]/5 shadow-sm hover:border-[var(--accent)]/20 transition-all group/slot">
@@ -2887,7 +2995,7 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
                         >
                           Username
                           <span className="text-[9px]">
-                            {luckyDrawSort === "username_desc" ? "↓" : "↑"}
+                            {luckyDrawSort === "username_desc" ? "â†“" : "â†‘"}
                           </span>
                         </button>
                       </th>
@@ -3556,7 +3664,7 @@ function ModCard({ mod, onToggle, onUpdate, toast }) {
   const handleSave = () => {
     onUpdate(mod.id, localName, localAccounts);
     setHasChanges(false);
-    toast.show(`Changes saved for ${localName}! 💜`, "success");
+    toast.show(`Changes saved for ${localName}! ðŸ’œ`, "success");
   };
 
   return (
@@ -3627,7 +3735,7 @@ function ModCard({ mod, onToggle, onUpdate, toast }) {
             : "bg-[var(--bg-primary)]/40 text-[var(--accent)]/20 cursor-not-allowed"}
         `}
       >
-        {hasChanges ? "Sync Changes 💜" : "Already Synced"}
+        {hasChanges ? "Sync Changes ðŸ’œ" : "Already Synced"}
       </button>
     </div>
   );
@@ -3670,7 +3778,7 @@ function GlobalConfigSection({ regions, mods, battles, liveBattles, timeline, ga
 
   const handleCopy = () => {
     navigator.clipboard.writeText(config);
-    toast.show("JSON Config copied to clipboard! 📋💜", "success");
+    toast.show("JSON Config copied to clipboard! ðŸ“‹ðŸ’œ", "success");
   };
 
   return (
@@ -3684,7 +3792,7 @@ function GlobalConfigSection({ regions, mods, battles, liveBattles, timeline, ga
           onClick={handleCopy}
           className="w-full md:w-auto bg-[var(--accent)] text-black dark:text-black font-black px-8 py-3 rounded-2xl shadow-xl shadow-[var(--accent)]/20 hover:scale-[1.05] active:scale-95 transition-all flex items-center justify-center gap-3 text-xs tracking-widest"
         >
-          <span>📋</span> COPY JSON
+          <span>ðŸ“‹</span> COPY JSON
         </button>
       </div>
 
@@ -3746,7 +3854,7 @@ function GalleryManagerSection({
               type="submit"
               className="w-full md:w-auto bg-[var(--accent)] text-black dark:text-black font-black px-8 py-3 rounded-xl shadow-lg shadow-[var(--accent)]/20 hover:scale-[1.05] active:scale-95 transition-all text-xs tracking-widest uppercase h-[46px]"
             >
-              Add To Pool 💜
+              Add To Pool ðŸ’œ
             </button>
           </div>
         </form>
@@ -3869,3 +3977,7 @@ function MenuButton({ tab, label, current, set, close }) {
 }
 
 export default AdminPanel;
+
+
+
+

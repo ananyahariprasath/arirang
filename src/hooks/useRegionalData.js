@@ -1,15 +1,24 @@
 import { useState, useEffect } from "react";
 import { INITIAL_REGIONS, DATA_SOURCE_URL, FOCUS_PLAYLISTS } from "../constants";
 
+function clonePlaylists(playlists = FOCUS_PLAYLISTS) {
+  return {
+    spotify: Array.isArray(playlists?.spotify)
+      ? playlists.spotify.map((pl) => ({ name: String(pl?.name || ""), url: String(pl?.url || "") }))
+      : [],
+    appleMusic: Array.isArray(playlists?.appleMusic)
+      ? playlists.appleMusic.map((pl) => ({ name: String(pl?.name || ""), url: String(pl?.url || "") }))
+      : [],
+  };
+}
+
 function normalizeRegion(region = {}) {
   const updated = { ...region };
   if (!updated.goal && updated.hashtag) {
     updated.goal = "Stream and support ARIRANG!";
     delete updated.hashtag;
   }
-  if (!updated.playlists) {
-    updated.playlists = FOCUS_PLAYLISTS;
-  }
+  updated.playlists = clonePlaylists(updated.playlists || FOCUS_PLAYLISTS);
   return updated;
 }
 
@@ -86,13 +95,15 @@ export default function useRegionalData() {
   };
 
   const addRegion = (newRegion) => {
-    const updated = normalizeRegions([
-      ...regions.filter((region) => region.country !== newRegion.country),
-      newRegion,
-    ]);
-    setRegions(updated);
-    localStorage.setItem("regionalData", JSON.stringify(updated));
-    void persistRegions(updated);
+    setRegions((prev) => {
+      const updated = normalizeRegions([
+        ...prev.filter((region) => region.country !== newRegion.country),
+        newRegion,
+      ]);
+      localStorage.setItem("regionalData", JSON.stringify(updated));
+      void persistRegions(updated);
+      return updated;
+    });
   };
 
   const deleteRegion = (country) => {
