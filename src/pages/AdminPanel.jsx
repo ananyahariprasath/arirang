@@ -312,7 +312,7 @@ function AdminViewPanel() {
   );
 }
 
-function AdminPanel() {
+function AdminPanel({ onMaintenanceModeChange = () => {} }) {
   const [activeTab, setActiveTab] = useState("tickets");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [tickets, setTickets] = useState([]);
@@ -367,6 +367,10 @@ function AdminPanel() {
   const [luckyDrawError, setLuckyDrawError] = useState("");
   const [luckyDrawFilter, setLuckyDrawFilter] = useState("");
   const [luckyDrawSort, setLuckyDrawSort] = useState("username_asc");
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  const [maintenanceMessage, setMaintenanceMessage] = useState("Website is under maintenance");
+  const [maintenanceLoading, setMaintenanceLoading] = useState(true);
+  const [maintenanceSaving, setMaintenanceSaving] = useState(false);
   const { battles, liveBattles, addBattle, updateBattle, updateLiveBattles, deleteBattle, clearBattles, resetLiveBattles, loading: battlesLoading } = useBattles();
   const { events, addEvent, updateEvent, deleteEvent, clearTimeline, resetToDefault, loading: timelineLoading } = useTimeline();
   const { regions, addRegion, deleteRegion, resetRegions, loading: regionsLoading } = useRegionalData();
@@ -467,6 +471,53 @@ function AdminPanel() {
     }
     return sorted;
   }, [luckyDrawEntries, luckyDrawFilter, luckyDrawSort]);
+
+  useEffect(() => {
+    let active = true;
+    const loadMaintenanceMode = async () => {
+      setMaintenanceLoading(true);
+      try {
+        const response = await fetch("/api/app-config?key=maintenanceMode", { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        if (!active || !response.ok) return;
+        const entry = Array.isArray(data?.value) && data.value.length > 0 ? data.value[0] : {};
+        const enabled = Boolean(entry?.enabled);
+        const message = String(entry?.message || "Website is under maintenance").trim() || "Website is under maintenance";
+        setMaintenanceEnabled(enabled);
+        setMaintenanceMessage(message);
+      } catch {
+        // Keep defaults if loading fails.
+      } finally {
+        if (active) setMaintenanceLoading(false);
+      }
+    };
+    loadMaintenanceMode();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleSaveMaintenanceMode = async () => {
+    setMaintenanceSaving(true);
+    try {
+      const payload = [{ enabled: maintenanceEnabled, message: maintenanceMessage.trim() || "Website is under maintenance" }];
+      const response = await fetch("/api/app-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "maintenanceMode", value: payload }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to save maintenance mode");
+      }
+      onMaintenanceModeChange({ enabled: maintenanceEnabled, message: payload[0].message });
+      toast.show(maintenanceEnabled ? "Maintenance mode enabled." : "Maintenance mode disabled.", "success");
+    } catch (error) {
+      toast.show(error?.message || "Failed to save maintenance mode", "error");
+    } finally {
+      setMaintenanceSaving(false);
+    }
+  };
 
   const battleValidation = useMemo(() => {
     const hints = [];
@@ -1401,6 +1452,7 @@ function AdminPanel() {
                   .replace("regions", "Regions")
                   .replace("mods", "Mods")
                   .replace("lucky-draw", "Lucky Draw")
+                  .replace("maintenance", "Maintenance")
                   .replace("missions", "Daily Missions")
                   .replace("updates", "Daily Updates")
                   .replace("global", "Global Config")
@@ -1423,6 +1475,7 @@ function AdminPanel() {
                   <MenuButton tab="regions" label="Region Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="mods" label="Mod Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="lucky-draw" label="Lucky Draw" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
+                  <MenuButton tab="maintenance" label="Maintenance" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="missions" label="Daily Missions" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="updates" label="Daily Updates" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
                   <MenuButton tab="gallery" label="Gallery Manager" current={activeTab} set={setActiveTab} close={() => setIsMenuOpen(false)} />
@@ -3385,6 +3438,64 @@ function AdminPanel() {
                     ))}
                   </div>
                 ) : null}
+              </div>
+            </div>
+          </section>
+        )}
+        {activeTab === "maintenance" && (
+          <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="max-w-3xl">
+              <div className="bg-[var(--card-bg)]/70 backdrop-blur-xl border border-[var(--accent)]/30 rounded-3xl p-6 sm:p-8 space-y-6">
+                <div>
+                  <h2 className="text-2xl font-black tracking-tight text-[var(--accent)]">Website Maintenance Mode</h2>
+                  <p className="mt-2 text-sm font-semibold text-[var(--text-secondary)]">
+                    When enabled, users will only see the maintenance message instead of the website.
+                  </p>
+                </div>
+
+                {maintenanceLoading ? (
+                  <p className="text-sm font-semibold text-[var(--text-secondary)]">Loading maintenance settings...</p>
+                ) : (
+                  <>
+                    <label className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--accent)]/20 bg-[var(--bg-primary)]/40 px-4 py-3">
+                      <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-[var(--text-primary)]">Enable Maintenance Mode</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={maintenanceEnabled}
+                        onClick={() => setMaintenanceEnabled((prev) => !prev)}
+                        className={`relative h-7 w-14 rounded-full transition-all ${
+                          maintenanceEnabled ? "bg-red-500/80" : "bg-[var(--accent)]/20"
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${
+                            maintenanceEnabled ? "left-8" : "left-1"
+                          }`}
+                        />
+                      </button>
+                    </label>
+
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-black text-[var(--text-secondary)]">Maintenance Message</label>
+                      <input
+                        type="text"
+                        value={maintenanceMessage}
+                        onChange={(e) => setMaintenanceMessage(e.target.value)}
+                        placeholder="Website is under maintenance"
+                        className="mt-2 w-full bg-[var(--bg-primary)] border border-[var(--accent)]/20 p-3 rounded-xl text-sm focus:outline-none focus:border-[var(--accent)] transition-all text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/40"
+                      />
+                    </div>
+
+                    <button
+                      onClick={handleSaveMaintenanceMode}
+                      disabled={maintenanceSaving}
+                      className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[var(--accent)] text-black dark:text-black text-xs font-black uppercase tracking-widest hover:brightness-110 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {maintenanceSaving ? "Saving..." : "Save Maintenance Settings"}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </section>
