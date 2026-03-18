@@ -6,6 +6,7 @@ import ConfirmModal from "../modals/ConfirmModal";
 const DEFAULT_COVER = "/assets/images/bts-un-photo-1.jpg";
 const TOPIC_ROOMS_READS_KEY_PREFIX = "topic_rooms_reads_v1_";
 const TOPIC_ROOMS_UNREAD_KEY_PREFIX = "topic_rooms_unread_total_v1_";
+const TOPIC_ROOMS_POLL_MS = 30000;
 
 function toIdentity(value) {
   return String(value || "").trim().replace(/^@+/, "").toLowerCase();
@@ -83,6 +84,7 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
   const adminExpiryInputRef = useRef(null);
   const isApplyingRemoteRef = useRef(false);
   const hasLoadedRemoteRef = useRef(false);
+  const isTopicRoomsFetchInFlightRef = useRef(false);
 
   const currentUserIdentity = toIdentity(user?.username || user?.email || "");
   const currentUserLabel = String(user?.username || user?.email || "you");
@@ -129,6 +131,9 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
   useEffect(() => {
     if (!isOpen) return;
     const intervalId = setInterval(async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (isTopicRoomsFetchInFlightRef.current) return;
+      isTopicRoomsFetchInFlightRef.current = true;
       try {
         const response = await fetch("/api/topic-rooms", { cache: "no-store" });
         const data = await response.json().catch(() => ({}));
@@ -142,11 +147,12 @@ export default function TopicRoomsModal({ isOpen = true, onClose, mode = "modal"
       } catch {
         // Silent polling failure.
       } finally {
+        isTopicRoomsFetchInFlightRef.current = false;
         setTimeout(() => {
           isApplyingRemoteRef.current = false;
         }, 0);
       }
-    }, 15000);
+    }, TOPIC_ROOMS_POLL_MS);
     return () => clearInterval(intervalId);
   }, [isOpen]);
 

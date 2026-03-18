@@ -74,6 +74,14 @@ function sanitizeRooms(input) {
     .filter((room) => room.id && room.title);
 }
 
+function stableStringify(value) {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "";
+  }
+}
+
 export default async function handler(req, res) {
   setCors(res);
 
@@ -101,6 +109,16 @@ export default async function handler(req, res) {
 
     const rooms = sanitizeRooms(req.body?.rooms);
     const config = sanitizeConfig(req.body?.config || {});
+    const existing = await collection.findOne({ _id: "global" }, { projection: { rooms: 1, config: 1 } });
+    const existingRooms = sanitizeRooms(existing?.rooms);
+    const existingConfig = sanitizeConfig(existing?.config || {});
+
+    if (
+      stableStringify(existingRooms) === stableStringify(rooms) &&
+      stableStringify(existingConfig) === stableStringify(config)
+    ) {
+      return res.status(200).json({ success: true, rooms: existingRooms, config: existingConfig, skipped: true });
+    }
 
     await collection.updateOne(
       { _id: "global" },

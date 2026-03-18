@@ -9,6 +9,7 @@ import useDailyMissions from "../../hooks/useDailyMissions";
 import DailyMissionsDrawer from "../ui/DailyMissionsDrawer";
 
 const TOPIC_ROOMS_UNREAD_KEY_PREFIX = "topic_rooms_unread_total_v1_";
+const TOPIC_ROOMS_ACTIVE_ROOMS_POLL_MS = 60000;
 
 function toIdentity(value) {
   return String(value || "").trim().replace(/^@+/, "").toLowerCase();
@@ -216,6 +217,7 @@ function Header({ onToggleSection }) {
   const profileRef = useRef(null);
   const mobileMenuRef = useRef(null);
   const translateRef = useRef(null);
+  const isTopicRoomsActiveFetchInFlightRef = useRef(false);
 
   useEffect(() => {
     const stored = String(localStorage.getItem("site_translate_lang") || "en").toLowerCase();
@@ -419,6 +421,9 @@ function Header({ onToggleSection }) {
   useEffect(() => {
     let active = true;
     const loadActiveRooms = async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      if (isTopicRoomsActiveFetchInFlightRef.current) return;
+      isTopicRoomsActiveFetchInFlightRef.current = true;
       try {
         const response = await fetch("/api/topic-rooms", { cache: "no-store" });
         const data = await response.json().catch(() => ({}));
@@ -429,10 +434,12 @@ function Header({ onToggleSection }) {
         setTopicRoomsActiveCount(count);
       } catch {
         // Silent failure
+      } finally {
+        isTopicRoomsActiveFetchInFlightRef.current = false;
       }
     };
     loadActiveRooms();
-    const intervalId = setInterval(loadActiveRooms, 30000);
+    const intervalId = setInterval(loadActiveRooms, TOPIC_ROOMS_ACTIVE_ROOMS_POLL_MS);
     return () => {
       active = false;
       clearInterval(intervalId);
