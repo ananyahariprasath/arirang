@@ -1320,8 +1320,8 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
 
   const handleCancelCustomNotification = async () => {
     if (!token || cancelCustomNotifLoading) return;
-    if (!activeBattleNotification?.id || !String(activeBattleNotification.id).startsWith("custom:")) {
-      toast.show("No active custom notification to cancel.", "info");
+    if (!activeBattleNotification?.id) {
+      toast.show("No active notification to cancel.", "info");
       return;
     }
 
@@ -1869,7 +1869,7 @@ function AdminPanel({ onMaintenanceModeChange = () => {} }) {
                     <button
                       type="button"
                       onClick={handleCancelCustomNotification}
-                      disabled={cancelCustomNotifLoading || !activeBattleNotification?.id || !String(activeBattleNotification.id).startsWith("custom:")}
+                      disabled={cancelCustomNotifLoading || !activeBattleNotification?.id}
                       className="px-3 py-1.5 rounded-lg border border-red-500/40 text-red-400 text-[9px] font-black uppercase tracking-widest hover:bg-red-500/10 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {cancelCustomNotifLoading ? "Cancelling..." : "Cancel Now"}
