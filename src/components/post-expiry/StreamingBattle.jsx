@@ -7,6 +7,7 @@ const STATUS_COLORS = {
   "Heating Up": "bg-amber-500/20 text-amber-400 border-amber-500/30",
   "Almost There": "bg-violet-500/20 text-violet-400 border-violet-500/30",
   "Yet to Start": "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  Completed: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
 };
 
 const PROGRESS_GRADIENT = "from-purple-500 to-[var(--accent)]";
@@ -318,7 +319,10 @@ function LiveBattleCard({ battle, onView, combinedProgress }) {
   const displayProgress = Number.isFinite(combinedProgress)
     ? combinedProgress
     : Math.round((albumProgress + titleProgress) / 2);
-  const albumStatus = getStatusFromProgress(displayProgress);
+  const manualStatus = String(battle?.status || "").trim();
+  const albumStatus = STATUS_COLORS[manualStatus]
+    ? manualStatus
+    : getStatusFromProgress(displayProgress);
   const statusClass = STATUS_COLORS[albumStatus] ?? "bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/30";
 
   return (
